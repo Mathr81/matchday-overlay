@@ -14,7 +14,7 @@
   let run = 0;
 
   const chapters = [...new Set(script.map((s) => s.chapter))];
-  const chapter = $derived(index >= 0 ? script[index].chapter : '');
+  const chapter = $derived(script[index]?.chapter ?? '');
 
   onMount(() => {
     connection = connect('control', { onSnapshot: (s) => (snapshot = s) });
@@ -44,7 +44,9 @@
       if (!(await send(command))) break;
       await sleep(step.wait);
     }
-    if (mine === run) running = false;
+    if (mine !== run) return;
+    running = false;
+    index = script.length - 1;
   }
 
   async function quit() {
