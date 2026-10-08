@@ -86,3 +86,17 @@ Compte à rebours avant le coup d'envoi, pause fraîcheur, but en cours de véri
 
 - Comment produire le flux vertical TikTok en même temps que le 16:9 (vMix n'a qu'un format de sortie par instance) : à étudier avant l'étape 9:16.
 - L'essai vMix de 60 jours doit couvrir le jour du match.
+
+## Réalisation
+
+Demande du 8 octobre : pas de plan d'implémentation détaillé ni de sous-agents, coder directement, étape par étape.
+
+### Étape 1 — socle (faite le 8 octobre)
+
+- Serveur Node (Fastify + WebSocket), journal `data/match.jsonl` écrit sur disque à chaque action, état recalculé à partir du journal, chrono sans tic-tac côté serveur.
+- Overlay `/overlay/16x9` avec le score du thème Tigre : entrée et sortie animées, score qui roule, étiquette de temps additionnel.
+- Contrôle minimal `/control` : coup d'envoi, pause, fin de période, buts, annulation du dernier but, temps additionnel, masquer le score, nouveau match.
+- Vérifié : 19 tests automatiques ; mise à jour en direct de l'overlay ; serveur tué brutalement puis relancé, score et chrono retrouvés et overlay reconnecté tout seul.
+- Pas encore vérifié : le rendu dans vMix et dans OBS (à faire sur le PC de régie).
+- Reporté à l'étape 3 comme prévu : code PIN, effectifs, historique complet.
+- Détail technique : TypeScript 6 plutôt que 7, l'outil de vérification Svelte ne gère pas encore la version 7 seule.

@@ -1,0 +1,30 @@
+@import '@fontsource-variable/anybody/wdth-italic.css';
+
+/* Thème Tigre : motif du coup de griffe (inclinaison 14°), typo à largeur variable. */
+.tigre {
+  --o: #ef5407;
+  --k: #0a0a0a;
+  --w: #f3eee4;
+  font-family: 'Anybody Variable', sans-serif;
+  font-style: italic;
+  font-weight: 900;
+  font-variation-settings: 'wdth' var(--wd, 90);
+  text-transform: uppercase;
+  line-height: 1;
+  color: var(--w);
+}
+
+/* Parallélogramme révélable : --p ouvre par la droite, --q ferme par la gauche.
+   --s vaut hauteur × tan(14°) pour garder la même inclinaison partout. */
+.tigre .para {
+  clip-path: polygon(
+    calc(var(--s) + (100% - var(--s)) * var(--q, 0)) 0,
+    calc(var(--s) + (100% - var(--s)) * var(--p, 1)) 0,
+    calc((100% - var(--s)) * var(--p, 1)) 100%,
+    calc((100% - var(--s)) * var(--q, 0)) 100%
+  );
+}
+
+.tigre .hatch {
+  background-image: repeating-linear-gradient(104deg, rgba(255, 255, 255, 0.045) 0 2px, transparent 2px 13px);
+}
