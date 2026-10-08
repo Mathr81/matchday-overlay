@@ -28,6 +28,7 @@ const { score, clock } = store.match;
 console.log('\n  matchday-overlay est lancé\n');
 console.log(`  Overlay 16:9 (vMix / OBS)  http://localhost:${port}/overlay/16x9`);
 console.log(`  Contrôle (ce PC)           http://localhost:${port}/control`);
+console.log(`  Simulation                 http://localhost:${port}/simulation`);
 if (lan) console.log(`  Contrôle (téléphone)       http://${lan}:${port}/control`);
 console.log(`\n  Match repris : ${score.home} - ${score.away}, ${clock.phase === 'pre' ? 'pas encore commencé' : `période ${clock.period}`}`);
 if (store.skippedLines) console.log(`  Attention : ${store.skippedLines} ligne(s) illisible(s) ignorée(s) dans data/match.jsonl`);

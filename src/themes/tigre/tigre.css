@@ -28,3 +28,24 @@
 .tigre .hatch {
   background-image: repeating-linear-gradient(104deg, rgba(255, 255, 255, 0.045) 0 2px, transparent 2px 13px);
 }
+
+/* Lettre masquée : son contenu monte ou descend derrière le cache. */
+.tigre .ch {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+  padding: 0.08em 0.14em 0;
+  margin: 0 -0.14em;
+}
+.tigre .ch > span {
+  display: inline-block;
+}
+
+/* Emplacement des moments : bas gauche. */
+.tigre.mo {
+  position: absolute;
+  left: 80px;
+  bottom: 96px;
+  visibility: hidden;
+  filter: drop-shadow(0 16px 26px rgba(0, 0, 0, 0.55));
+}

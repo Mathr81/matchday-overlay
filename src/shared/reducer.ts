@@ -1,3 +1,4 @@
+import { minuteLabel } from './clock';
 import type { ClockState, JournalRecord, MatchEvent, MatchFormat, MatchState } from './types';
 
 export function initialState(): MatchState {
@@ -5,6 +6,8 @@ export function initialState(): MatchState {
     score: { home: 0, away: 0 },
     clock: { period: 0, phase: 'pre', baseMs: 0, elapsedMs: 0, anchorAt: null, addedMinutes: null },
     lastGoalId: null,
+    timeline: [],
+    cards: {},
   };
 }
 
@@ -29,6 +32,7 @@ function stopClock(clock: ClockState, at: number) {
 
 function apply(state: MatchState, e: MatchEvent, format: MatchFormat) {
   const clock = state.clock;
+  if ('team' in e) state.timeline.push({ ...e, minute: minuteLabel(clock, format, e.at) });
   switch (e.type) {
     case 'period_started':
       state.clock = {
@@ -55,6 +59,17 @@ function apply(state: MatchState, e: MatchEvent, format: MatchFormat) {
       stopClock(clock, e.at);
       clock.phase = clock.period >= format.periods ? 'ended' : 'break';
       break;
+    case 'clock_adjusted':
+      clock.elapsedMs = e.elapsedMs;
+      if (clock.anchorAt !== null) clock.anchorAt = e.at;
+      break;
+    case 'card': {
+      if (!e.player) break;
+      const card = (state.cards[`${e.team}:${e.player}`] ??= { yellow: 0, red: false });
+      if (e.color === 'yellow') card.yellow++;
+      else card.red = true;
+      break;
+    }
     case 'goal':
       state.score[e.team]++;
       state.lastGoalId = e.id;

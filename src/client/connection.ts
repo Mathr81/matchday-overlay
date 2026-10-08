@@ -1,4 +1,4 @@
-import type { Ack, Command, CommandBody, Role, ServerMessage, Snapshot } from '../shared/types';
+import type { Ack, Command, CommandBody, Cue, Role, ServerMessage, Snapshot } from '../shared/types';
 
 export interface Connection {
   send(body: CommandBody): Promise<Ack>;
@@ -8,6 +8,7 @@ export interface Connection {
 interface Handlers {
   /** `offset` = heure du serveur moins heure locale, à ajouter à Date.now() pour le chrono. */
   onSnapshot(snapshot: Snapshot, offset: number): void;
+  onCue?(cue: Cue): void;
   onStatus?(online: boolean): void;
 }
 
@@ -35,6 +36,8 @@ export function connect(role: Role, handlers: Handlers): Connection {
       const message: ServerMessage = JSON.parse(ev.data);
       if (message.type === 'snapshot') {
         handlers.onSnapshot(message, message.serverNow - Date.now());
+      } else if (message.type === 'cue') {
+        handlers.onCue?.(message.cue);
       } else {
         pending.get(message.cid)?.resolve(message);
         pending.delete(message.cid);

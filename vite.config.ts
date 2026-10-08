@@ -11,7 +11,7 @@ export default defineConfig({
     outDir: '../dist/web',
     emptyOutDir: true,
     rollupOptions: {
-      input: { overlay16x9: page('overlay/16x9.html'), control: page('control/index.html') },
+      input: { overlay16x9: page('overlay/16x9.html'), control: page('control/index.html'), simulation: page('simulation/index.html') },
     },
   },
   server: {

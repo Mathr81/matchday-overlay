@@ -16,8 +16,8 @@ const cmd = (body: CommandBody, cid = `c${++n}`): Command => ({ ...body, cid });
 describe('Journal', () => {
   it('reloads what was appended', () => {
     const file = path.join(tmp(), 'match.jsonl');
-    new Journal(file).append({ id: 'a', at: 1, type: 'goal', team: 'home' });
-    expect(new Journal(file).load()).toEqual({ records: [{ id: 'a', at: 1, type: 'goal', team: 'home' }], skipped: 0 });
+    new Journal(file).append({ id: 'a', at: 1, type: 'goal', team: 'home', kind: 'normal' });
+    expect(new Journal(file).load()).toEqual({ records: [{ id: 'a', at: 1, type: 'goal', team: 'home', kind: 'normal' }], skipped: 0 });
   });
 
   it('skips a line truncated by a crash and keeps writing cleanly after it', () => {
@@ -25,7 +25,7 @@ describe('Journal', () => {
     fs.writeFileSync(file, '{"id":"a","at":1,"type":"goal","team":"home"}\n{"id":"b","at":2,"ty');
     const journal = new Journal(file);
     expect(journal.load().skipped).toBe(1);
-    journal.append({ id: 'c', at: 3, type: 'goal', team: 'away' });
+    journal.append({ id: 'c', at: 3, type: 'goal', team: 'away', kind: 'normal' });
     const { records, skipped } = journal.load();
     expect(records.map((r) => r.id)).toEqual(['a', 'c']);
     expect(skipped).toBe(1);
@@ -78,6 +78,49 @@ describe('MatchStore', () => {
     expect(second.match.score.home).toBe(1);
   });
 
+  it('turns a second yellow into a sending-off and refuses a third card', () => {
+    const store = new MatchStore(tmp(), defaultConfig());
+    const cues: (string | undefined)[] = [];
+    store.subscribe((cue) => cues.push(cue?.type === 'card' ? cue.color : undefined));
+    store.execute(cmd({ type: 'card', team: 'away', color: 'yellow', player: 'a4' }));
+    store.execute(cmd({ type: 'card', team: 'away', color: 'yellow', player: 'a4' }));
+    expect(cues).toEqual(['yellow', 'second_yellow']);
+    expect(store.execute(cmd({ type: 'card', team: 'away', color: 'red', player: 'a4' })).ok).toBe(false);
+  });
+
+  it('disallows a goal: score goes back and the scorer is announced', () => {
+    const store = new MatchStore(tmp(), defaultConfig());
+    let last: unknown;
+    store.subscribe((cue) => (last = cue));
+    store.execute(cmd({ type: 'start_period' }));
+    store.execute(cmd({ type: 'set_clock', seconds: 21 * 60 + 30 }));
+    expect(store.execute(cmd({ type: 'set_clock', seconds: -5 })).ok).toBe(false);
+    store.execute(cmd({ type: 'goal', team: 'home', scorer: 'h9', assist: 'h10' }, 'g1'));
+    expect(last).toMatchObject({ type: 'goal', minute: "22'", scorer: { number: 9, name: 'Hugo Lambert' }, assist: { number: 10 } });
+    store.execute(cmd({ type: 'disallow_goal', target: 'g1' }));
+    expect(store.match.score.home).toBe(0);
+    expect(last).toMatchObject({ type: 'goal_disallowed', team: 'home', minute: "22'", scorer: { number: 9 } });
+  });
+
+  it('credits an own goal to the other team but names the real scorer', () => {
+    const store = new MatchStore(tmp(), defaultConfig());
+    let last: unknown;
+    store.subscribe((cue) => (last = cue));
+    store.execute(cmd({ type: 'goal', team: 'home', kind: 'own', scorer: 'a3' }));
+    expect(store.match.score).toEqual({ home: 1, away: 0 });
+    expect(last).toMatchObject({ team: 'home', kind: 'own', scorer: { name: 'M. Martin' } });
+  });
+
+  it('plays a simulation on a separate journal and gives the real match back untouched', () => {
+    const store = new MatchStore(tmp(), defaultConfig());
+    store.execute(cmd({ type: 'goal', team: 'home' }));
+    store.execute(cmd({ type: 'simulation', on: true }));
+    expect(store.snapshot()).toMatchObject({ simulation: true, match: { score: { home: 0, away: 0 } } });
+    store.execute(cmd({ type: 'goal', team: 'away' }));
+    store.execute(cmd({ type: 'simulation', on: false }));
+    expect(store.snapshot()).toMatchObject({ simulation: false, match: { score: { home: 1, away: 0 } } });
+  });
+
   it('archives the journal on reset', () => {
     const dir = tmp();
     const store = new MatchStore(dir, defaultConfig());
@@ -123,6 +166,8 @@ describe('WebSocket', () => {
     await control.next();
 
     control.send({ type: 'goal', team: 'home' });
+    // Le signal d'animation arrive avant le nouvel état.
+    expect(await overlay.next()).toMatchObject({ type: 'cue', cue: { type: 'goal', team: 'home' } });
     const pushed = (await overlay.next()) as Snapshot;
     expect(pushed.type).toBe('snapshot');
     expect(pushed.match.score.home).toBe(1);

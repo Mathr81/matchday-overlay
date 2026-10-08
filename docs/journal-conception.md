@@ -100,3 +100,17 @@ Demande du 8 octobre : pas de plan d'implémentation détaillé ni de sous-agent
 - Pas encore vérifié : le rendu dans vMix et dans OBS (à faire sur le PC de régie).
 - Reporté à l'étape 3 comme prévu : code PIN, effectifs, historique complet.
 - Détail technique : TypeScript 6 plutôt que 7, l'outil de vérification Svelte ne gère pas encore la version 7 seule.
+
+Retour du 8 octobre sur l'étape 1 : tout fonctionne dans vMix, fluide.
+
+### Étape 2 — moments de match et simulation (faite le 8 octobre)
+
+- Événements ajoutés au journal : but avec buteur, passeur et type (normal, penalty, contre son camp), but refusé, penalty annoncé et raté, cartons, remplacement, correction du chrono.
+- Le deuxième jaune est détecté par le serveur ; un joueur expulsé ne peut plus recevoir de carton.
+- Signaux d'animation envoyés aux overlays connectés, joués une seule fois, avec une file : un moment à la fois, et celui en cours écourte sa sortie si un autre attend.
+- Le score est retenu pendant le plein écran d'un but et ne roule qu'à sa sortie.
+- Thème Tigre : plein écran de but aux couleurs de l'équipe, bandeau (but, but refusé, penalty, penalty raté), carton, deuxième jaune qui se retourne en rouge, remplacement.
+- Contrôle : choix du joueur dans une grille, type de but, cartons, remplacement, penalty, refuser le dernier but.
+- Simulation : match scripté jusqu'à la fin du temps réglementaire (2 – 2), sur un journal à part.
+- Effectifs d'exemple inventés dans la configuration par défaut : à remplacer par les vrais noms.
+- Vérifié : 23 tests ; but, but adverse, deuxième jaune contrôlés par captures ; simulation complète sans erreur. Pas encore vérifié dans vMix.

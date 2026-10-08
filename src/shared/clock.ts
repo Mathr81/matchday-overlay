@@ -25,3 +25,16 @@ export function periodLabel(clock: ClockState, format: MatchFormat): string {
   if (format.periods === 2) return clock.period === 1 ? '1re mi-temps' : '2e mi-temps';
   return `Période ${clock.period}`;
 }
+
+/** Minute de jeu d'un événement : « 67' », ou « 45+2' » dans le temps additionnel. */
+export function minuteLabel(clock: ClockState, format: MatchFormat, at: number): string {
+  const length = format.periodMinutes * 60_000;
+  const within = elapsedInPeriod(clock, at);
+  if (within < length) return `${Math.floor((clock.baseMs + within) / 60_000) + 1}'`;
+  return `${(clock.baseMs + length) / 60_000}+${Math.floor((within - length) / 60_000) + 1}'`;
+}
+
+/** Un joueur est expulsé après un rouge ou deux jaunes. */
+export function isSentOff(card: { yellow: number; red: boolean } | undefined): boolean {
+  return !!card && (card.red || card.yellow >= 2);
+}

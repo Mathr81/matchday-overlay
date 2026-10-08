@@ -17,9 +17,9 @@ describe('reduce', () => {
   it('counts goals per team and remembers the last one', () => {
     const s = reduce(
       [
-        { id: 'a', at: T0, type: 'goal', team: 'home' },
-        { id: 'b', at: T0, type: 'goal', team: 'away' },
-        { id: 'c', at: T0, type: 'goal', team: 'home' },
+        { id: 'a', at: T0, type: 'goal', team: 'home', kind: 'normal' },
+        { id: 'b', at: T0, type: 'goal', team: 'away', kind: 'normal' },
+        { id: 'c', at: T0, type: 'goal', team: 'home', kind: 'normal' },
       ],
       format,
     );
@@ -30,8 +30,8 @@ describe('reduce', () => {
   it('ignores voided events', () => {
     const s = reduce(
       [
-        { id: 'a', at: T0, type: 'goal', team: 'home' },
-        { id: 'b', at: T0, type: 'goal', team: 'home' },
+        { id: 'a', at: T0, type: 'goal', team: 'home', kind: 'normal' },
+        { id: 'b', at: T0, type: 'goal', team: 'home', kind: 'normal' },
         { id: 'v', at: T0, type: 'void', target: 'b' },
       ],
       format,
