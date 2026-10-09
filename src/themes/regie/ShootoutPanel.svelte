@@ -1,6 +1,7 @@
 <script lang="ts">
   import gsap from 'gsap';
   import { getContext, onMount } from 'svelte';
+  import { lastKick } from '../../shared/lineup';
   import type { Config, ShootoutState, TeamId } from '../../shared/types';
   import Roll from '../Roll.svelte';
   import { leave, OUT } from './motion';
@@ -13,6 +14,7 @@
   const tall = getContext<boolean>('tall') ?? false;
   const teams: TeamId[] = ['home', 'away'];
   const series = $derived(config.format.shootout.kicks);
+  const last = $derived(lastKick(config, shootout));
   let root: HTMLDivElement;
   let labels: HTMLSpanElement;
   let tl: gsap.core.Timeline | undefined;
@@ -51,7 +53,11 @@
 
 <div class="regie shoot" class:sudden={shootout?.suddenDeath} bind:this={root} style:--pw="{Math.min(30, Math.floor((tall ? 380 : 520) / (shootout?.rounds ?? series)) - 10)}px">
   <div class="rule"></div>
-  <div class="head sheet"><span class="up"><span class="rise"><span class="lab labels" bind:this={labels}><span>Tirs au but</span><span>Mort subite</span></span></span></span></div>
+  <div class="head sheet"><span class="up"><span class="rise"><span class="lab labels" bind:this={labels}><span>Tirs au but</span><span>Mort subite</span></span></span></span>
+    {#if last}
+      {#key last.id}<span class="last lab fade" class:ko={!last.scored}><b class="mono">{last.number}</b>{last.name}<i></i></span>{/key}
+    {/if}
+  </div>
   {#each teams as team (team)}
     {@const t = config.teams[team]}
     {@const kicks = shootout?.kicks.filter((k) => k.team === team) ?? []}
@@ -105,6 +111,35 @@
     height: 14px;
     padding: 0;
     margin: 0;
+  }
+  /* Nom du dernier tireur, s'il a été saisi, avec un voyant vert ou rouge. */
+  .last {
+    margin-left: auto;
+    padding-left: 30px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--tx);
+    white-space: nowrap;
+    animation: last-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .last b {
+    color: var(--mut);
+  }
+  .last i {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #35d683;
+  }
+  .last.ko i {
+    background: var(--alert);
+  }
+  @keyframes last-in {
+    from {
+      transform: translateX(16px);
+      opacity: 0;
+    }
   }
   .labels span {
     display: block;

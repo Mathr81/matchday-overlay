@@ -77,9 +77,6 @@
 </div>
 
 <style>
-  .col {
-    top: 200px !important;
-  }
   .head {
     display: flex;
     align-items: baseline;
@@ -188,9 +185,6 @@
   }
 
   /* Vertical : une équipe par ligne, le « vs » sur le trait qui les sépare. */
-  :global(.tall) .col {
-    top: var(--safe-top) !important;
-  }
   :global(.tall) .head {
     flex-direction: column;
     gap: 12px;

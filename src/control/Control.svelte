@@ -37,6 +37,8 @@
   let bannerSubtitle = $state('');
   // Mode correction des stats : un appui retire un au lieu d'ajouter.
   let statMinus = $state(false);
+  // Tireur du prochain tir au but, facultatif : remis à vide après chaque tir.
+  let kicker = $state('');
   let connection: Connection | undefined;
   let errorTimer: ReturnType<typeof setTimeout>;
   let undoTimer: ReturnType<typeof setTimeout>;
@@ -108,7 +110,8 @@
   }
 
   function kick(team: TeamId, scored: boolean) {
-    send({ type: 'shootout_kick', team, scored }, `Tir ${scored ? 'marqué' : 'raté'}`);
+    send({ type: 'shootout_kick', team, scored, player: kicker || undefined }, `Tir ${scored ? 'marqué' : 'raté'}`);
+    kicker = '';
   }
 
   function togglePreview() {
@@ -305,6 +308,12 @@
         <p class="done">
           Tirs au but {shootout.score.home} – {shootout.score.away}{shootout.suddenDeath ? ' · mort subite' : ''} · au tour de <b>{config.teams[team].name}</b>
         </p>
+        <select class="kicker" bind:value={kicker} aria-label="Tireur">
+          <option value="">Tireur (facultatif)</option>
+          {#each lineup(config, match, team).pitch.filter((p) => !isSentOff(match.cards[`${team}:${p.id}`])) as p (p.id)}
+            <option value={p.id}>{p.number} {p.name}</option>
+          {/each}
+        </select>
         <div class="pair kicks">
           <button class="scored" onclick={() => kick(team, true)}>Marqué</button>
           <button class="red" onclick={() => kick(team, false)}>Raté</button>
@@ -833,6 +842,18 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .kicker {
+    width: 100%;
+    min-height: 52px;
+    margin-bottom: 8px;
+    padding: 0 14px;
+    font: inherit;
+    font-size: 17px;
+    color: inherit;
+    background: #1b1b1d;
+    border: 1px solid #2a2a2e;
+    border-radius: 10px;
   }
   .kicks button {
     min-height: 96px;

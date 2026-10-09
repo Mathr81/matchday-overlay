@@ -75,7 +75,7 @@ export function buildScene(id: SceneId, config: Config): Scene {
       if (tied) {
         add(now - 5 * MIN, { type: 'shootout_started', first: 'home' });
         const series = id === 'shootout' ? [true, true, true, false, true] : id === 'sudden' ? [true, true, true, false, true, true, true, false, true, true, true, true] : [true, true, true, false, true, true, true, false, true, true, true, false];
-        series.forEach((scored, i) => add(now - 4 * MIN + i * 1000, { type: 'shootout_kick', team: i % 2 ? 'away' : 'home', scored }));
+        series.forEach((scored, i) => add(now - 4 * MIN + i * 1000, { type: 'shootout_kick', team: i % 2 ? 'away' : 'home', scored, player: id_(i % 2 ? 'away' : 'home', 10 - Math.floor(i / 2)) }));
       }
       if (!tied || id === 'winner-shootout') add(now - MIN, { type: 'match_ended' });
     }

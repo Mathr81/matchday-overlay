@@ -111,12 +111,14 @@
 .regie.panel .col {
   position: absolute;
   left: 50%;
-  top: 110px;
+  top: 50%;
+  transform: translateY(-50%);
   width: 1320px;
   margin-left: -660px;
 }
 .tall .regie.panel .col {
-  top: var(--safe-top);
+  /* Centré dans la zone laissée libre par l'interface de TikTok. */
+  top: calc((1920px + var(--safe-top) - var(--safe-bottom)) / 2);
   width: 980px;
   margin-left: -490px;
 }

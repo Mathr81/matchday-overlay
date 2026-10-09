@@ -2,7 +2,7 @@
 
 Habillage de score animé pour les lives du BDT, piloté depuis un téléphone et affiché dans vMix ou OBS.
 
-État actuel : tout un match de foot se gère en thème Tigre, du compte à rebours à la séance de tirs au but ; tout se configure depuis la page d'admin ; les déclencheurs vMix et les adresses pour Companion sont en place. Restent les thèmes Régie et Clair et le format vertical, décrits dans `docs/superpowers/specs/2026-10-08-matchday-overlay-design.md`.
+État actuel : tout un match de foot se gère du compte à rebours à la séance de tirs au but, en 16:9 et en vertical, avec trois thèmes interchangeables en direct ; tout se configure depuis la page d'admin ; les déclencheurs vMix et les adresses pour Companion sont en place. Reste la répétition générale sur le PC de régie : une partie de ce qui suit n'a été vérifiée que dans un navigateur (voir « Ce qui reste à vérifier » en bas).
 
 ## Lancer
 
@@ -14,9 +14,11 @@ Il faut Node.js 24 et pnpm.
 | Page | Adresse |
 |---|---|
 | Overlay 16:9 | `http://localhost:4455/overlay/16x9` |
+| Overlay 9:16 (vertical) | `http://localhost:4455/overlay/9x16` |
 | Contrôle | `http://localhost:4455/control` |
 | Simulation | `http://localhost:4455/simulation` |
 | Admin | `http://localhost:4455/admin` |
+| Galerie des thèmes | `http://localhost:4455/galerie` |
 
 Le contrôle, l'admin et la simulation demandent un **code PIN** à quatre chiffres, affiché dans la console au démarrage. Il est tiré au hasard à la première utilisation et se change dans la page d'admin ; le changer déconnecte tous les téléphones. Les overlays n'ont pas besoin de code et n'acceptent aucune commande.
 
@@ -36,6 +38,29 @@ Si Windows demande d'autoriser Node.js sur le réseau, accepte pour les réseaux
 2. URL : `http://localhost:4455/overlay/16x9`, largeur 1920, hauteur 1080.
 3. Laisse le CSS personnalisé par défaut (fond transparent).
 
+## Thèmes
+
+Trois thèmes complets, à choisir dans la page d'admin (ou par une adresse Companion). Le changement se fait en direct : tout ce qui est à l'antenne sort avec l'ancien thème, puis rentre avec le nouveau.
+
+| Thème | Allure | Mouvement |
+|---|---|---|
+| **Tigre** | Bandes inclinées orange et noir, grosses lettres en italique | Coups de griffe : les blocs s'ouvrent en biais, les mots s'étirent |
+| **Régie** | Verre sombre, angles droits, chiffres en police de console | Un trait blanc se trace, la surface se déplie à partir de lui, les textes montent |
+| **Clair** | Pastilles blanches, disques, texte en minuscules | Tout rebondit : les pastilles gonflent, confettis sur les buts |
+
+Les couleurs, logos et noms viennent toujours de la configuration. Des aperçus sont dans `docs/maquettes/` (fichiers `03` à `05`).
+
+### Galerie
+
+`http://localhost:4455/galerie` montre chaque élément de l'habillage (score, buts, cartons, remplacement, panneaux, bandeaux, tirs au but) avec des données d'exemple, pour chaque thème et dans les deux formats. Rien n'est envoyé à l'antenne et le match n'est pas touché : c'est l'endroit pour juger un thème ou vérifier un nom trop long. Elle reprend les équipes et les textes de la configuration.
+
+## Format vertical (TikTok)
+
+`http://localhost:4455/overlay/9x16` est le même habillage recomposé pour une image de 1080×1920 : score centré en haut, moments en bas, panneaux en colonne. Il reçoit le même match et les mêmes animations que le 16:9, au même moment.
+
+- **Marges de sécurité** : dans l'admin, « Format vertical ». Rien ne s'affiche dans la marge du haut (230 px par défaut) ni dans celle du bas (520 px), pour laisser la place à l'interface de TikTok. Ces valeurs sont une estimation : règle-les en regardant un vrai live sur un téléphone.
+- **Produire le flux vertical** : vMix sort un seul format par instance. La piste la plus simple, à essayer en répétition : OBS en parallèle sur le même PC, avec un canevas de 1080×1920, l'image de vMix reçue en NDI ou par la sortie externe de vMix et recadrée au centre, et une source Navigateur sur `/overlay/9x16` par-dessus. Je n'ai pas pu l'essayer.
+
 ## Configuration (page d'admin)
 
 `http://localhost:4455/admin`, à ouvrir de préférence sur le PC. Tout s'applique à l'enregistrement, sans redémarrer, et le match en cours n'est pas touché.
@@ -44,6 +69,7 @@ Si Windows demande d'autoriser Node.js sur le réseau, accepte pour les réseaux
 - **Équipes** : nom, sigle, couleur, logo (PNG, JPEG, WebP ou SVG, 2 Mo au plus), et la case « logo sombre » qui le pose sur un fond clair.
 - **Joueurs** : numéro, nom, titulaire ou remplaçant ; ajout et retrait.
 - **Format** : nombre et durée des périodes, prolongations, tirs au but.
+- **Format vertical** : marges de sécurité du haut et du bas.
 - **Bandeaux enregistrés** : titre, sous-titre, lien pour QR code.
 - **Code PIN**.
 
@@ -78,7 +104,7 @@ La section « Companion et Stream Deck » de l'admin liste des adresses prêtes 
 | `/api/do/score/toggle` (ou `show`, `hide`) | Afficher ou masquer le score |
 | `/api/do/banner/1` (ou `2`, `3`…, `off`) | Lancer ou retirer un bandeau enregistré |
 | `/api/do/panel/summary` (ou `prematch`, `lineup-home`, `lineup-away`, `stats`, `holding`, `off`) | Afficher ou retirer un panneau |
-| `/api/do/theme/tigre` | Changer de thème |
+| `/api/do/theme/tigre` (ou `regie`, `clair`) | Changer de thème |
 
 Toutes prennent `?key=…`. Les buts, cartons et tirs au but ne passent pas par là : ils restent sur la page de contrôle, où l'on choisit le joueur.
 
@@ -111,13 +137,14 @@ Le format se règle dans la page d'admin : prolongations (deux périodes, 15 min
 
 - À la fin du temps réglementaire sur une égalité, le contrôle propose ce que le format permet : lancer la prolongation, passer aux tirs au but (en choisissant qui tire en premier), ou terminer sur ce score. Avec les deux options désactivées, le match se termine tout seul.
 - Pendant la séance, deux gros boutons « Marqué » et « Raté » pour l'équipe dont c'est le tour. Le panneau s'affiche tout seul, avec une case par tir.
+- Au-dessus des deux boutons, une liste permet de choisir le tireur avant de valider. C'est facultatif ; s'il est choisi, son nom s'affiche sur le panneau à côté du résultat.
 - L'app sait quand c'est fini : une équipe qui ne peut plus être rattrapée, ou la mort subite après une série à égalité (une case de plus s'ouvre à chaque tour).
 - « Annuler le dernier tir » corrige une erreur, même après la fin de la séance.
 - Le vainqueur n'est jamais annoncé tout seul : le bouton « Annoncer le vainqueur à l'antenne » lance le plein écran. Il existe aussi pour un match gagné dans le temps de jeu.
 
 ## Simulation
 
-La page de simulation rejoue un match complet (avant-match, compositions, buts, penalty, but refusé, cartons, deuxième jaune, remplacement, stats, résumés, prolongations, tirs au but avec mort subite, annonce du vainqueur) pour juger les animations sans être sur le terrain. Elle montre un aperçu de l'overlay, et l'entrée vMix ou OBS affiche la même chose au même moment.
+La page de simulation rejoue un match complet (avant-match, compositions, buts, penalty, but refusé, cartons, deuxième jaune, remplacement, stats, résumés, prolongations, tirs au but avec mort subite, annonce du vainqueur) pour juger les animations sans être sur le terrain. Elle montre un aperçu de l'overlay (16:9 ou vertical, au choix), et l'entrée vMix ou OBS affiche la même chose au même moment.
 
 Le vrai match est mis de côté pendant la simulation et revient intact avec « Quitter ». Seule exception : le panneau et le bandeau à l'antenne sont retirés au lancement et à la sortie de la simulation. Un redémarrage du serveur revient aussi au vrai match.
 
@@ -133,8 +160,21 @@ Tout est dans le dossier `data/` :
 
 Recharger l'overlay ou redémarrer le serveur ne perd ni le score ni le chrono.
 
+## Ce qui reste à vérifier
+
+Tout ce qui suit a été construit et contrôlé dans un navigateur, par captures, mais pas encore vu sur le PC de régie :
+
+- dans vMix ou OBS : les panneaux, les prolongations et les tirs au but, le format vertical, les thèmes Régie et Clair ;
+- la fluidité réelle des animations (les captures ne montrent que des images fixes) ;
+- l'effet des déclencheurs vMix : les fonctions des exemples (`OverlayInput2In`, `ReplayMarkInOut`) sont à confirmer avec le bouton « Tester » ;
+- l'envoi d'un logo par le sélecteur de fichiers de l'admin ;
+- les marges du format vertical sur un vrai live TikTok, et la façon de produire ce flux.
+
+Le plus rapide : lancer la simulation avec l'overlay ouvert dans vMix, une fois par thème.
+
 ## Développement
 
 - `pnpm test` : tests de la logique de match et du serveur.
 - `pnpm check` : vérification des types.
 - `pnpm dev:server` et `pnpm dev:web` : serveur et pages avec rechargement à chaud (pages sur le port 5173).
+- Un thème est un dossier de `src/themes/` qui fournit quatre composants (score, moments, panneaux, bandeau libre) ; il s'ajoute dans `src/themes/index.ts`, `src/themes/names.ts` et la liste `THEMES` de `src/shared/types.ts`.

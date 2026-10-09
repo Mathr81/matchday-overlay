@@ -201,3 +201,39 @@ Faite sans l'utilisateur, qui n'a pas accès au PC : à revoir avec lui.
 - Vérifié : 50 tests, captures de tous les éléments en 9:16 et d'un échantillon en 16:9.
 - Pas vérifié : le rendu dans vMix ou OBS, et la position réelle de l'interface de TikTok.
 - Toujours ouvert : comment produire le flux vertical en même temps que le 16:9 (voir le README).
+
+### Fin de l'étape 6 — Thèmes Régie et Clair (faits le 9 octobre)
+
+Consigne de l'utilisateur, parti en cours sans accès au PC : « Fais tout ce que tu peux, je veux vraiment que ce soit parfait quand je reviens. » Écart assumé avec la méthode prévue : la spec demandait une étude de mouvement validée avant de construire chaque thème. Sans lui pour valider, j'ai construit les deux thèmes en entier et c'est la galerie qui tient lieu d'étude : il jugera sur pièce, et un thème qui ne lui plaît pas se retravaille sans toucher au reste.
+
+**Régie** — sobre, sombre, précis.
+- Motif : un trait blanc de deux pixels se trace d'abord, la surface se déplie à partir de lui, les textes montent derrière un cache. Angles droits partout, aucune inclinaison.
+- Typo : Archivo (largeur variable) en capitales, chiffres en JetBrains Mono. Les noms arrivent lettres écartées puis se resserrent ; les numéros défilent au hasard avant de se figer.
+- Couleur : verre presque noir, accent jaune-vert pour les étiquettes ; les couleurs d'équipe ne sont que des liserés et des aplats courts.
+- Score : barre compacte, un filet en bas avance avec la période et passe en couleur d'accent dans le temps additionnel ; sur un but, la couleur de l'équipe traverse sa case.
+- But : un grand bandeau sur toute la largeur, entre deux traits qui partent en sens opposés, puis le bandeau du buteur prend le relais au même endroit.
+- Écran d'attente : cadre de visée, signal qui parcourt un trait en boucle.
+
+**Clair** — lumineux, rond, joyeux.
+- Motif : la pastille. Elle s'ouvre depuis son centre, les disques des logos rebondissent, les étiquettes de couleur se posent de travers.
+- Typo : Bricolage Grotesque, en minuscules (les deux autres thèmes sont en capitales).
+- Score : centré en haut dans les deux formats, score dans une capsule sombre, chrono dans une petite pastille accrochée dessous.
+- But : un grand disque à la couleur de l'équipe gonfle au centre, « But ! » arrive lettre par lettre, confettis en éventail ; trois salves pour une victoire.
+- Panneaux : voile clair et cartes blanches, joueurs en pastilles, barres de stats arrondies.
+
+Pour les deux : même liste d'éléments que Tigre, dans les deux formats, avec les mêmes garde-fous (taille du nom ajustée à sa longueur, logo sombre sur fond clair).
+
+Autres changements du jour :
+- Tirs au but : le contrôle propose une liste facultative pour choisir le tireur ; son nom s'affiche sur le panneau des trois thèmes, avec le résultat.
+- Outils communs aux thèmes sortis de Tigre (`src/themes/util.ts`, `src/themes/Roll.svelte`).
+- Planches d'aperçu enregistrées : `docs/maquettes/03-tigre-*.png`, `04-regie-*.png`, `05-clair-*.png` (but, bandeau du buteur, résumé, avant-match ou composition, en 16:9 et en 9:16).
+
+Vérifié : 50 tests, types, captures de chaque élément des trois thèmes dans les deux formats, changement de thème en direct par les adresses Companion sur la vraie page d'overlay, sans erreur dans la console.
+
+Pas vérifié, et c'est important : le mouvement lui-même. Mon navigateur de test tourne à deux images par seconde ; je n'ai vu que des images fixes. Les durées et les courbes sont réglées d'après celles de Tigre, que l'utilisateur a validé en vrai, mais Régie et Clair n'ont jamais été vus en mouvement par personne. Pas vérifié non plus : le rendu dans vMix et OBS.
+
+### Reste à faire
+
+- Étape 9 : répétition générale sur le PC de régie (liste dans le README, « Ce qui reste à vérifier »).
+- Retours de l'utilisateur sur Régie et Clair.
+- Décider comment produire le flux vertical.

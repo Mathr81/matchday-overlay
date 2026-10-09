@@ -1,6 +1,7 @@
 <script lang="ts">
   import gsap from 'gsap';
   import { getContext, onMount } from 'svelte';
+  import { lastKick } from '../../shared/lineup';
   import type { Config, ShootoutState, TeamId } from '../../shared/types';
   import { leave, OUT } from './motion';
   import RollNumber from './RollNumber.svelte';
@@ -14,6 +15,7 @@
   const series = $derived(config.format.shootout.kicks);
   // Vertical : sigle au lieu du nom, et des cases qui rétrécissent si la mort subite s'éternise.
   const tall = getContext<boolean>('tall') ?? false;
+  const last = $derived(lastKick(config, shootout));
   const pipWidth = $derived(tall ? `${Math.min(58, Math.floor(440 / (shootout?.rounds ?? series)))}px` : undefined);
   let root: HTMLDivElement;
   let labels: HTMLDivElement;
@@ -51,7 +53,12 @@
 </script>
 
 <div class="tigre shoot" bind:this={root} style:--pw={pipWidth}>
-  <div class="head para"><div bind:this={labels}><span>Tirs au but</span><span>Mort subite</span></div></div>
+  <div class="tops">
+    <div class="head para"><div bind:this={labels}><span>Tirs au but</span><span>Mort subite</span></div></div>
+    {#if last}
+      {#key last.id}<div class="last para" class:ko={!last.scored}><span>{last.number} {last.name}</span></div>{/key}
+    {/if}
+  </div>
   {#each teams as team, i (team)}
     {@const t = config.teams[team]}
     {@const kicks = shootout?.kicks.filter((k) => k.team === team) ?? []}
@@ -89,6 +96,36 @@
     letter-spacing: 0.14em;
     --wd: 88;
     overflow: hidden;
+  }
+  .tops {
+    display: flex;
+  }
+  /* Nom du dernier tireur, s'il a été saisi : vert s'il a marqué, rouge sinon. */
+  .last {
+    height: 40px;
+    --s: 10px;
+    margin-left: -3px;
+    padding: 0 28px 0 26px;
+    display: flex;
+    align-items: center;
+    background: #23d17a;
+    color: var(--k);
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    --wd: 88;
+    white-space: nowrap;
+    animation: last-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .last.ko {
+    background: #f0323c;
+    color: #fff;
+  }
+  @keyframes last-in {
+    from {
+      transform: translateX(-30px);
+      opacity: 0;
+    }
   }
   .head span {
     display: block;

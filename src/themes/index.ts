@@ -1,4 +1,8 @@
 import type { ThemeId } from '../shared/types';
+import ClairFreeBanner from './clair/FreeBanner.svelte';
+import ClairMoment from './clair/Moment.svelte';
+import ClairPanel from './clair/Panel.svelte';
+import ClairScorebug from './clair/Scorebug.svelte';
 import RegieFreeBanner from './regie/FreeBanner.svelte';
 import RegieMoment from './regie/Moment.svelte';
 import RegiePanel from './regie/Panel.svelte';
@@ -22,5 +26,6 @@ export interface Theme {
 
 export const themes: Record<ThemeId, Theme> = {
   tigre: { Scorebug: TigreScorebug, Moment: TigreMoment, Panel: TigrePanel, FreeBanner: TigreFreeBanner },
+  clair: { Scorebug: ClairScorebug, Moment: ClairMoment, Panel: ClairPanel, FreeBanner: ClairFreeBanner },
   regie: { Scorebug: RegieScorebug, Moment: RegieMoment, Panel: RegiePanel, FreeBanner: RegieFreeBanner },
 };

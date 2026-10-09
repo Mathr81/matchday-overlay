@@ -42,3 +42,13 @@ export function countdownText(remaining: number | null): string {
   const s = Math.ceil(remaining / 1000);
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
+
+/** Couleur d'équipe assombrie si elle est trop claire pour se lire sur du blanc. */
+export function onLight(hex: string): string {
+  const n = parseInt(hex.replace('#', ''), 16);
+  const lin = (c: number) => (c / 255) ** 2.2;
+  const luminance = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+  if (luminance < 0.4) return hex;
+  const mix = (c: number) => Math.round(c * 0.6);
+  return `rgb(${mix((n >> 16) & 255)}, ${mix((n >> 8) & 255)}, ${mix(n & 255)})`;
+}
