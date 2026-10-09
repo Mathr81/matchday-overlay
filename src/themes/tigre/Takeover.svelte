@@ -1,6 +1,6 @@
 <script lang="ts">
   import gsap from 'gsap';
-  import { onMount } from 'svelte';
+  import { getContext, onMount } from 'svelte';
   import type { TeamConfig } from '../../shared/types';
   import { inkOn, OUT } from './motion';
   import './tigre.css';
@@ -15,6 +15,7 @@
     x = 470,
     crestX = 1440,
     hold = 2.2,
+    tallFit = { fontSize: 300, width: 110, x: 400, crestX: 1040 },
     onexit,
     ondone,
   }: {
@@ -27,15 +28,20 @@
     x?: number;
     crestX?: number;
     hold?: number;
+    /** Mêmes réglages pour le format vertical, où la bande est plus courte. */
+    tallFit?: { fontSize: number; width: number; x: number; crestX: number };
     /** Appelé quand le plein écran commence à sortir. */
     onexit?: () => void;
     ondone?: () => void;
   } = $props();
 
+  const tall = getContext<boolean>('tall') ?? false;
+  const g = $derived(tall ? tallFit : { fontSize, width, x, crestX });
   let root: HTMLDivElement;
 
   onMount(() => {
     const q = gsap.utils.selector(root);
+    const { width } = g;
     const bands = q('.st1, .band, .st2');
     const tl = gsap
       .timeline({ onComplete: () => ondone?.() })
@@ -59,7 +65,7 @@
   });
 </script>
 
-<div class="tigre tk" bind:this={root} style:--band={team.color} style:--ink={inkOn(team.color)} style:--fs="{fontSize}px" style:--x="{x}px" style:--cx="{crestX}px">
+<div class="tigre tk" bind:this={root} style:--band={team.color} style:--ink={inkOn(team.color)} style:--fs="{g.fontSize}px" style:--x="{g.x}px" style:--cx="{g.crestX}px">
   <div class="shade"></div>
   <div class="rot">
     <div class="st1"></div>
@@ -191,5 +197,26 @@
     border: 10px solid var(--w);
     border-radius: 50%;
     opacity: 0;
+  }
+
+  /* Vertical : bande plus inclinée, blason posé à cheval sur son bord haut. */
+  :global(.tall) .rot {
+    left: -300px;
+    top: 720px;
+    width: 1700px;
+    transform: rotate(-12deg);
+  }
+  :global(.tall) .crest {
+    top: -170px;
+    width: 300px;
+    height: 300px;
+  }
+  :global(.tall) .logo.chip {
+    width: 230px;
+    height: 230px;
+    margin: 35px;
+  }
+  :global(.tall) .ring {
+    inset: 35px;
   }
 </style>

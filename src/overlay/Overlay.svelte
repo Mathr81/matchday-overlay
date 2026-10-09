@@ -1,9 +1,17 @@
 <script lang="ts">
-  import { onMount, untrack } from 'svelte';
+  import { onMount, setContext, untrack } from 'svelte';
   import { connect } from '../client/connection';
   import type { Banner, Cue, Panel as PanelData, Snapshot, TeamId, ThemeId } from '../shared/types';
   import { themes } from '../themes';
   import { Slot } from './slot.svelte';
+
+  // `tall` : format vertical 1080×1920. Les thèmes le lisent dans le contexte pour recomposer leurs éléments.
+  // `feed` remplace la connexion au serveur (galerie) ; `fixed` laisse la mise à l'échelle à la page qui l'accueille.
+  type Feed = (handlers: { onSnapshot(s: Snapshot, offset: number): void; onCue(cue: Cue): void }) => { close(): void };
+  let { tall = false, feed, fixed = false }: { tall?: boolean; feed?: Feed; fixed?: boolean } = $props();
+  setContext('tall', untrack(() => tall));
+  const W = $derived(tall ? 1080 : 1920);
+  const H = $derived(tall ? 1920 : 1080);
 
   /** Temps laissé aux éléments pour sortir avant de changer de thème. */
   const THEME_EXIT_MS = 900;
@@ -68,15 +76,16 @@
   }
 
   onMount(() => {
-    const connection = connect('overlay', {
-      onSnapshot: (s, o) => {
+    const handlers = {
+      onSnapshot: (s: Snapshot, o: number) => {
         snapshot = s;
         offset = o;
       },
       onCue,
-    });
-    // La scène fait toujours 1920×1080 ; elle est réduite pour tenir dans une fenêtre plus petite.
-    const fit = () => (scale = Math.min(innerWidth / 1920, innerHeight / 1080));
+    };
+    const connection = feed ? feed(handlers) : connect('overlay', handlers);
+    // La scène a une taille fixe (1920×1080, ou 1080×1920 en vertical) ; elle est réduite pour tenir dans une fenêtre plus petite.
+    const fit = () => (scale = fixed ? 1 : Math.min(innerWidth / W, innerHeight / H));
     fit();
     addEventListener('resize', fit);
     return () => {
@@ -86,7 +95,15 @@
   });
 </script>
 
-<div class="stage" style:transform="scale({scale})">
+<div
+  class="stage"
+  class:tall
+  style:width="{W}px"
+  style:height="{H}px"
+  style:transform="scale({scale})"
+  style:--safe-top="{snapshot?.config.vertical.top ?? 230}px"
+  style:--safe-bottom="{snapshot?.config.vertical.bottom ?? 520}px"
+>
   {#if snapshot && match && theme}
     {#key themeId}
       <theme.Scorebug config={snapshot.config} {match} visible={snapshot.display.scoreVisible && !covering && !switching} {offset} />
@@ -110,17 +127,10 @@
 </div>
 
 <style>
-  :global(html, body) {
-    margin: 0;
-    background: transparent;
-    overflow: hidden;
-  }
   .stage {
     position: absolute;
     left: 0;
     top: 0;
-    width: 1920px;
-    height: 1080px;
     transform-origin: 0 0;
     overflow: hidden;
   }

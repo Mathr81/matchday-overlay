@@ -36,9 +36,11 @@ const { score, clock } = store.match;
 
 console.log('\n  matchday-overlay est lancé\n');
 console.log(`  Overlay 16:9 (vMix / OBS)  http://localhost:${port}/overlay/16x9`);
+console.log(`  Overlay 9:16 (vertical)    http://localhost:${port}/overlay/9x16`);
 console.log(`  Contrôle (ce PC)           http://localhost:${port}/control`);
 console.log(`  Simulation                 http://localhost:${port}/simulation`);
 console.log(`  Admin (configuration)      http://localhost:${port}/admin`);
+console.log(`  Galerie des thèmes         http://localhost:${port}/galerie`);
 if (lan) console.log(`  Contrôle (téléphone)       http://${lan}:${port}/control`);
 console.log(`\n  Code PIN du contrôle       ${pin}   (modifiable dans la page d'admin)`);
 console.log(`\n  Match repris : ${score.home} - ${score.away}, ${clock.phase === 'pre' ? 'pas encore commencé' : `période ${clock.period}`}`);

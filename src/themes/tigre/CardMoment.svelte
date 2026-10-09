@@ -1,8 +1,8 @@
 <script lang="ts">
   import gsap from 'gsap';
-  import { onMount } from 'svelte';
+  import { getContext, onMount } from 'svelte';
   import type { PlayerRef, TeamConfig } from '../../shared/types';
-  import { ALERT, letters, OUT } from './motion';
+  import { ALERT, fit, letters, OUT } from './motion';
   import './tigre.css';
 
   // Le carton tombe en tournant. Deuxième jaune : il se pose sur le premier, puis les deux se retournent en rouge.
@@ -24,6 +24,7 @@
 
   const labels = { yellow: ['Carton jaune'], red: ['Carton rouge'], second_yellow: ['Deuxième carton jaune', 'Expulsion'] };
   const name = $derived(player?.name ?? team.name);
+  const tall = getContext<boolean>('tall') ?? false;
   let root: HTMLDivElement;
   let tl: gsap.core.Timeline | undefined;
 
@@ -71,7 +72,7 @@
   });
 </script>
 
-<div class="tigre mo card-mo" class:red={color === 'red'} bind:this={root} style:--team={team.color}>
+<div class="tigre mo card-mo" class:red={color === 'red'} bind:this={root} style:--team={team.color} style:--fs="{tall ? fit(name, 58, 1000) : 58}px">
   <div class="stack">
     <div class="card c1"></div>
     {#if color === 'second_yellow'}<div class="card c2"></div>{/if}
@@ -162,7 +163,7 @@
   }
   .who {
     position: relative;
-    font-size: 58px;
+    font-size: var(--fs);
     white-space: nowrap;
     display: flex;
     gap: 18px;
@@ -188,5 +189,9 @@
   }
   .min {
     opacity: 0.7;
+  }
+  :global(.tall) .card-mo {
+    left: 70px;
+    gap: 28px;
   }
 </style>

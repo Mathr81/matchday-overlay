@@ -1,6 +1,6 @@
 <script lang="ts">
   import gsap from 'gsap';
-  import { onMount } from 'svelte';
+  import { getContext, onMount } from 'svelte';
   import { formatClock, periodLabel } from '../../shared/clock';
   import type { Config, MatchState } from '../../shared/types';
   import RollNumber from './RollNumber.svelte';
@@ -9,6 +9,8 @@
   let { config, match, visible, offset }: { config: Config; match: MatchState; visible: boolean; offset: number } = $props();
 
   const OUT = 'expo.out';
+  // Vertical : score centré en haut, chrono et période sur une deuxième ligne.
+  const tall = getContext<boolean>('tall') ?? false;
   let root: HTMLDivElement;
   let addTag: HTMLDivElement;
   let penTag: HTMLDivElement;
@@ -108,9 +110,10 @@
       <span>{away.code}</span>
       <span class="logo" class:chip={away.logoOnLight}><img src={away.logo} alt="" /></span>
     </div>
-    <div class="seg para s-clock"><span>{clockText}</span></div>
+    {#if !tall}<div class="seg para s-clock"><span>{clockText}</span></div>{/if}
   </div>
   <div class="sub">
+    {#if tall}<div class="seg para s-clock"><span>{clockText}</span></div>{/if}
     <div class="tag para t-per"><span>{periodLabel(match.clock, config.format)}</span></div>
     <div class="tag para t-add" bind:this={addTag}><span>+{addedText}</span></div>
     <div class="tag para t-add t-pen" bind:this={penTag}><span>{pens?.home ?? 0} – {pens?.away ?? 0}</span></div>
@@ -222,5 +225,45 @@
     color: var(--k);
     font-size: 18px;
     letter-spacing: 0.04em;
+  }
+
+  :global(.tall) .bug {
+    left: 0;
+    right: 0;
+    top: calc(var(--safe-top) / 1.5);
+    zoom: 1.5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform-origin: 50% 0;
+  }
+  :global(.tall) .s-away {
+    margin-right: 0;
+  }
+  :global(.tall) .sub {
+    position: relative;
+    margin: 5px 0 0 -34px;
+  }
+  :global(.tall) .s-clock {
+    height: 40px;
+    --s: 10px;
+    min-width: 118px;
+    margin: 0 -4px 0 0;
+    padding: 0 20px 0 22px;
+    font-size: 25px;
+  }
+  :global(.tall) .tag {
+    height: 40px;
+    --s: 10px;
+    font-size: 16px;
+  }
+  /* Les étiquettes orange s'ouvrent au bout de la ligne sans la décentrer. */
+  :global(.tall) .t-add {
+    position: absolute;
+    left: 100%;
+    top: 0;
+    margin-left: -3px;
+    font-size: 21px;
+    white-space: nowrap;
   }
 </style>

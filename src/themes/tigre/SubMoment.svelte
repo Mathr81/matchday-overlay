@@ -1,8 +1,8 @@
 <script lang="ts">
   import gsap from 'gsap';
-  import { onMount } from 'svelte';
+  import { getContext, onMount } from 'svelte';
   import type { PlayerRef, TeamConfig } from '../../shared/types';
-  import { inkOn, letters, OUT } from './motion';
+  import { fit, inkOn, letters, OUT } from './motion';
   import './tigre.css';
 
   // Le sortant arrive d'abord, puis l'entrant prend la grande ligne pendant que le sortant est barré.
@@ -22,6 +22,7 @@
     ondone?: () => void;
   } = $props();
 
+  const tall = getContext<boolean>('tall') ?? false;
   let root: HTMLDivElement;
   let tl: gsap.core.Timeline | undefined;
 
@@ -59,7 +60,7 @@
   });
 </script>
 
-<div class="tigre mo sub-mo" bind:this={root} style:--team={team.color} style:--ink={inkOn(team.color)}>
+<div class="tigre mo sub-mo" bind:this={root} style:--team={team.color} style:--ink={inkOn(team.color)} style:--fs="{tall ? fit(playerIn?.name ?? '', 60, 950) : 60}px">
   <div class="head para"><span>Remplacement · {team.name}</span><span class="min">{minute}</span></div>
   {#if playerIn}
     <div class="row in para">
@@ -114,7 +115,7 @@
     margin: 5px 0 0 -25px;
     padding: 0 64px 0 50px;
     gap: 22px;
-    font-size: 60px;
+    font-size: var(--fs);
   }
   .out {
     height: 58px;
@@ -162,5 +163,8 @@
     border-top: 15px solid #f0323c;
     border-left-width: 10px;
     border-right-width: 10px;
+  }
+  :global(.tall) .sub-mo {
+    left: 104px;
   }
 </style>

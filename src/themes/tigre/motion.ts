@@ -11,6 +11,9 @@ export function inkOn(hex: string): string {
   return luminance > 0.2 ? '#0a0a0a' : '#f3eee4';
 }
 
+/** Taille de police qui fait tenir un texte sur une ligne : `max` tant qu'il est court, puis réduite en proportion. */
+export const fit = (text: string, max: number, room: number) => Math.min(max, Math.round(room / Math.max(text.length, 1)));
+
 /** Lettres d'un texte, l'espace devenant insécable pour garder sa largeur une fois découpé. */
 export const letters = (text: string) => [...text].map((c) => (c === ' ' ? '\u00a0' : c));
 

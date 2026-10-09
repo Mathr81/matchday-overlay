@@ -82,4 +82,13 @@
     letter-spacing: 0.16em;
     --wd: 88;
   }
+  :global(.tall) .stats-panel {
+    bottom: var(--safe-bottom);
+  }
+  :global(.tall) .head {
+    width: 900px;
+  }
+  :global(.tall) .code {
+    width: 130px;
+  }
 </style>

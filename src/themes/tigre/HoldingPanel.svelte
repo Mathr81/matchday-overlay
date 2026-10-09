@@ -1,13 +1,14 @@
 <script lang="ts">
   import gsap from 'gsap';
-  import { onMount } from 'svelte';
+  import { getContext, onMount } from 'svelte';
   import type { Config } from '../../shared/types';
-  import { leave, OUT } from './motion';
+  import { fit, leave, OUT } from './motion';
   import './tigre.css';
 
   // Écran d'attente : couvre toute l'image, bandes qui défilent sans fin.
   let { config, leaving, ongone }: { config: Config; leaving: boolean; ongone: () => void } = $props();
 
+  const tall = getContext<boolean>('tall') ?? false;
   let root: HTMLDivElement;
   let tl: gsap.core.Timeline | undefined;
   let loops: gsap.core.Tween[] = [];
@@ -36,7 +37,7 @@
   });
 </script>
 
-<div class="tigre panel" bind:this={root}>
+<div class="tigre panel" bind:this={root} style:--tfs="{tall ? fit(config.texts.title, 44, 1450) : 44}px">
   <div class="back"></div>
   <div class="rot">
     <div class="strip thin"></div>
@@ -117,8 +118,9 @@
     align-items: center;
     background: var(--w);
     color: var(--k);
-    font-size: 44px;
+    font-size: var(--tfs);
     --wd: 100;
+    white-space: nowrap;
   }
   .subtitle {
     position: absolute;
@@ -135,5 +137,25 @@
     font-weight: 800;
     letter-spacing: 0.12em;
     --wd: 88;
+  }
+
+  :global(.tall) .rot {
+    left: -300px;
+    top: 720px;
+    width: 1700px;
+    transform: rotate(-12deg);
+  }
+  :global(.tall) .big {
+    height: 240px;
+    font-size: 128px;
+    line-height: 246px;
+  }
+  :global(.tall) .title {
+    left: 80px;
+    top: var(--safe-top);
+  }
+  :global(.tall) .subtitle {
+    left: 62px;
+    top: calc(var(--safe-top) + 82px);
   }
 </style>

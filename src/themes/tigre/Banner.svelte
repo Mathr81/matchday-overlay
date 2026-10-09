@@ -1,7 +1,7 @@
 <script lang="ts">
   import gsap from 'gsap';
-  import { onMount } from 'svelte';
-  import { inkOn, letters, OUT } from './motion';
+  import { getContext, onMount } from 'svelte';
+  import { fit, inkOn, letters, OUT } from './motion';
   import './tigre.css';
 
   // Bandeau bas gauche : étiquette de couleur, nom qui s'étire, griffes, ligne de détail.
@@ -30,6 +30,7 @@
     ondone?: () => void;
   } = $props();
 
+  const tall = getContext<boolean>('tall') ?? false;
   let root: HTMLDivElement;
   let tl: gsap.core.Timeline | undefined;
 
@@ -62,17 +63,19 @@
   });
 </script>
 
-<div class="tigre mo" bind:this={root} style:--c={color} style:--ink={inkOn(color)}>
+<div class="tigre mo" bind:this={root} style:--c={color} style:--ink={inkOn(color)} style:--fs="{tall ? fit(name, 70, 1000) : 70}px">
   <div class="r1">
     <div class="tag para">
       <span class="k">{tag}</span>
       {#if sub}<span class="sub">{sub}</span>{/if}
     </div>
-    <div class="main para hatch">
-      {#if number !== null}<span class="num">{number}</span>{/if}
-      <span class="name">{#each letters(name) as c, i (i)}<span class="ch"><span>{c}</span></span>{/each}</span>
+    <div class="mw">
+      <div class="main para hatch">
+        {#if number !== null}<span class="num">{number}</span>{/if}
+        <span class="name">{#each letters(name) as c, i (i)}<span class="ch"><span>{c}</span></span>{/each}</span>
+      </div>
+      <div class="claws"><i></i><i></i><i></i></div>
     </div>
-    <div class="claws"><i></i><i></i><i></i></div>
   </div>
   {#if metaLabel || metaValue}
     <div class="meta para">
@@ -85,8 +88,11 @@
 <style>
   .r1 {
     display: flex;
-    position: relative;
     width: max-content;
+  }
+  .mw {
+    display: flex;
+    position: relative;
   }
   .tag {
     height: 112px;
@@ -121,12 +127,12 @@
     gap: 22px;
   }
   .num {
-    font-size: 86px;
+    font-size: calc(var(--fs) * 1.23);
     color: var(--o);
     --wd: 70;
   }
   .name {
-    font-size: 70px;
+    font-size: var(--fs);
     white-space: nowrap;
   }
   .claws {
@@ -170,5 +176,29 @@
   }
   .meta b {
     font-weight: 900;
+  }
+
+  /* Vertical : l'étiquette passe au-dessus du nom, chaque ligne décalée pour suivre l'inclinaison. */
+  :global(.tall) .r1 {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  :global(.tall) .tag {
+    height: 54px;
+    --s: 13.5px;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    padding: 0 34px 0 32px;
+    margin: 0 0 5px 30px;
+  }
+  :global(.tall) .k {
+    font-size: 30px;
+  }
+  :global(.tall) .sub {
+    font-size: 19px;
+  }
+  :global(.tall) .meta {
+    margin-left: -13px;
   }
 </style>

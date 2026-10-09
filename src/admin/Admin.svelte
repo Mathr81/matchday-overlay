@@ -3,6 +3,7 @@
   import { api, savedToken } from '../client/connection';
   import PinForm from '../client/PinForm.svelte';
   import { THEMES, TRIGGER_EVENTS } from '../shared/types';
+  import { themeNames } from '../themes/names';
   import type { Config, PrivateSettings, TeamId, TriggerEvent, VmixLogEntry, VmixTrigger } from '../shared/types';
 
   let config = $state<Config | null>(null);
@@ -19,7 +20,6 @@
     { id: 'home', label: 'Équipe 1 (à gauche)' },
     { id: 'away', label: 'Équipe 2 (à droite)' },
   ];
-  const themeNames: Record<string, string> = { tigre: 'Tigre' };
   const dirty = $derived(config !== null && JSON.stringify({ config, settings }) !== saved);
   const events = Object.entries(TRIGGER_EVENTS) as [TriggerEvent, string][];
   const origin = location.origin;
@@ -128,7 +128,7 @@
         <label>
           Thème
           <select bind:value={config.theme}>
-            {#each THEMES as t (t)}<option value={t}>{themeNames[t] ?? t}</option>{/each}
+            {#each THEMES as t (t)}<option value={t}>{themeNames[t]}</option>{/each}
           </select>
         </label>
       </div>
@@ -179,6 +179,18 @@
         <label>Tirs par équipe avant la mort subite<input type="number" min="1" max="10" bind:value={config.format.shootout.kicks} disabled={!config.format.shootout.enabled} /></label>
       </div>
       <p class="hint">Changer le format pendant un match recalcule le chrono et les minutes déjà saisies.</p>
+    </section>
+
+    <section>
+      <h2>Format vertical (TikTok)</h2>
+      <p class="hint">
+        Sur l'overlay 9:16, rien ne s'affiche dans ces deux marges : elles laissent la place à l'interface de TikTok (titre du live en haut, commentaires et boutons en bas).
+        En pixels, sur une image de 1920 de haut.
+      </p>
+      <div class="grid">
+        <label>Marge du haut<input type="number" min="0" max="600" step="10" bind:value={config.vertical.top} /></label>
+        <label>Marge du bas<input type="number" min="0" max="900" step="10" bind:value={config.vertical.bottom} /></label>
+      </div>
     </section>
 
     <section>

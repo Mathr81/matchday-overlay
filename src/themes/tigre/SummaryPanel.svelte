@@ -249,4 +249,65 @@
     color: var(--o);
     font-weight: 900;
   }
+
+  /* Vertical : équipe, score, équipe empilés sur la pente ; buteurs et stats resserrés. */
+  :global(.tall) .column {
+    top: var(--safe-top);
+    gap: 18px;
+  }
+  :global(.tall) .top {
+    margin-left: 70px;
+    flex-wrap: wrap;
+    row-gap: 5px;
+    max-width: 950px;
+  }
+  :global(.tall) .title,
+  :global(.tall) .event {
+    height: 52px;
+    --s: 13px;
+    padding: 0 30px 0 32px;
+  }
+  :global(.tall) .title {
+    font-size: 30px;
+  }
+  :global(.tall) .event {
+    font-size: 19px;
+  }
+  :global(.tall) .scoreline {
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  :global(.tall) .seg {
+    margin-right: 0;
+  }
+  :global(.tall) .side {
+    position: relative;
+    left: 38px;
+    width: 780px;
+    height: 116px;
+    --s: 29px;
+    justify-content: center;
+    padding: 0 60px;
+  }
+  :global(.tall) .right {
+    left: -38px;
+  }
+  :global(.tall) .seg .crest {
+    width: 84px;
+    height: 84px;
+  }
+  :global(.tall) .team {
+    font-size: 50px;
+  }
+  :global(.tall) .scorers {
+    width: 940px;
+    gap: 70px;
+  }
+  :global(.tall) ul {
+    font-size: 23px;
+  }
+  :global(.tall) .who {
+    font-size: 32px;
+  }
 </style>

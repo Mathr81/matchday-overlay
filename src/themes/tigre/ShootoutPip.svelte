@@ -29,7 +29,7 @@
 
 <style>
   .pip {
-    width: 58px;
+    width: var(--pw, 58px);
     height: 38px;
     margin-right: -4px;
     position: relative;

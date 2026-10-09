@@ -42,6 +42,7 @@ export function defaultConfig(): Config {
       { title: 'Le BDT vous souhaite un bon match', subtitle: 'Bureau des Terminales · Barral 2027' },
       { title: 'Soutenez le BDT', subtitle: 'Scannez pour participer à la cagnotte', qr: 'https://example.org/cagnotte' },
     ],
+    vertical: { top: 230, bottom: 520 },
   };
 }
 
@@ -96,6 +97,7 @@ export function loadConfig(dataDir: string): { config: Config; settings: Private
       shootout: { ...defaults.format.shootout, ...saved.format?.shootout },
     },
     texts: { ...defaults.texts, ...saved.texts },
+    vertical: { ...defaults.vertical, ...saved.vertical },
   };
   if (saved.pin === undefined || saved.apiKey === undefined || saved.vmix === undefined) saveConfig(dataDir, config, settings);
   return { config, settings };
@@ -167,6 +169,7 @@ export function validateConfig(input: Partial<Config> | undefined): Config | str
         if (qr) banner.qr = qr;
         return banner;
       }),
+      vertical: { top: int(input?.vertical?.top, 'Marge du haut (vertical)', 0, 600), bottom: int(input?.vertical?.bottom, 'Marge du bas (vertical)', 0, 900) },
     };
   } catch (e) {
     if (e instanceof Invalid) return e.message;

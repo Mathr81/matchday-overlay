@@ -1,6 +1,6 @@
 <script lang="ts">
   import gsap from 'gsap';
-  import { onMount } from 'svelte';
+  import { getContext, onMount } from 'svelte';
   import type { Config, ShootoutState, TeamId } from '../../shared/types';
   import { leave, OUT } from './motion';
   import RollNumber from './RollNumber.svelte';
@@ -12,6 +12,9 @@
 
   const teams: TeamId[] = ['home', 'away'];
   const series = $derived(config.format.shootout.kicks);
+  // Vertical : sigle au lieu du nom, et des cases qui rétrécissent si la mort subite s'éternise.
+  const tall = getContext<boolean>('tall') ?? false;
+  const pipWidth = $derived(tall ? `${Math.min(58, Math.floor(440 / (shootout?.rounds ?? series)))}px` : undefined);
   let root: HTMLDivElement;
   let labels: HTMLDivElement;
   let tl: gsap.core.Timeline | undefined;
@@ -47,14 +50,14 @@
   });
 </script>
 
-<div class="tigre shoot" bind:this={root}>
+<div class="tigre shoot" bind:this={root} style:--pw={pipWidth}>
   <div class="head para"><div bind:this={labels}><span>Tirs au but</span><span>Mort subite</span></div></div>
   {#each teams as team, i (team)}
     {@const t = config.teams[team]}
     {@const kicks = shootout?.kicks.filter((k) => k.team === team) ?? []}
     <div class="row para hatch" class:second={i === 1} class:lost={!!shootout?.winner && shootout.winner !== team}>
       <span class="tile" class:light={t.logoOnLight} style:background={t.logoOnLight ? undefined : t.color}><img src={t.logo} alt="" /></span>
-      <span class="name">{t.name}</span>
+      <span class="name">{tall ? t.code : t.name}</span>
       <div class="pips">
         {#each Array(shootout?.rounds ?? series) as _, n (n)}
           <ShootoutPip result={kicks[n]?.scored ?? null} current={shootout?.next === team && n === kicks.length} extra={n >= series} />
@@ -146,5 +149,14 @@
     clip-path: polygon(14.5px 0, 100% 0, calc(100% - 14.5px) 100%, 0 100%);
     font-size: 44px;
     --wd: 100;
+  }
+  :global(.tall) .shoot {
+    left: 50%;
+    margin-left: 0;
+    transform: translateX(-50%);
+    bottom: var(--safe-bottom);
+  }
+  :global(.tall) .name {
+    width: 92px;
   }
 </style>

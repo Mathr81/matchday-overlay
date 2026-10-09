@@ -70,4 +70,14 @@
     background: var(--away);
     transform-origin: 0 50%;
   }
+  :global(.tall) .stat {
+    width: 900px;
+    padding: 0 34px;
+    grid-template-columns: 50px 1fr 210px 1fr 50px;
+    gap: 14px;
+    font-size: 28px;
+  }
+  :global(.tall) .label {
+    font-size: 17px;
+  }
 </style>

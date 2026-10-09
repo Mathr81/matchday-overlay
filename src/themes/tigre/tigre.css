@@ -50,6 +50,12 @@
   filter: drop-shadow(0 16px 26px rgba(0, 0, 0, 0.55));
 }
 
+/* Format vertical : les moments restent en bas à gauche, au-dessus de l'interface de TikTok. */
+.tall .tigre.mo {
+  left: 60px;
+  bottom: var(--safe-bottom);
+}
+
 /* Panneaux plein écran : voile sombre sur l'image, contenu par-dessus. */
 .tigre.panel {
   position: absolute;

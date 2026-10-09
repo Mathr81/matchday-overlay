@@ -183,3 +183,21 @@ Retour du 9 octobre sur l'étape 3 : tout fonctionne.
 - Vérifié : 50 tests ; essai de bout en bout avec un faux vMix local (connexion, appel de test, déclenchement réel sur un but).
 - Constat pendant l'essai : un vrai vMix 29 tournait sur ce PC et a répondu à la vérification de connexion (lecture seule). Aucune fonction ne lui a été envoyée : les appels de test sont partis vers le faux vMix.
 - Pas vérifié : l'effet réel des fonctions dans vMix. Les noms `OverlayInput2In` et `ReplayMarkInOut` des exemples viennent de ma connaissance de l'API vMix et sont à confirmer dans vMix avec le bouton « Tester ».
+
+### Étape 7 — Format vertical 9:16 (thème Tigre, faite le 9 octobre)
+
+Faite sans l'utilisateur, qui n'a pas accès au PC : à revoir avec lui.
+
+- `/overlay/9x16` : scène de 1080×1920, même état et mêmes signaux que le 16:9. La même page sert les deux formats.
+- Marges de sécurité réglables dans l'admin (haut 230 px, bas 520 px par défaut) : rien ne s'affiche dans la zone prise par l'interface de TikTok. Valeurs choisies d'après ma connaissance de l'interface du live TikTok, à ajuster sur un vrai téléphone.
+- Chaque élément du thème Tigre a une mise en page verticale, pas une réduction du 16:9 :
+  - score centré en haut, chrono et période sur une deuxième ligne ;
+  - bandeaux en bas à gauche, l'étiquette au-dessus du nom, la taille du nom ajustée à sa longueur ;
+  - plein écran « But » et « Victoire » : bande plus inclinée, blason à cheval sur son bord ;
+  - avant-match : les deux équipes l'une sous l'autre, chacune venant de son bord ;
+  - compositions en une colonne, résumé empilé (équipe, score, équipe), tirs au but avec les sigles et des cases qui rétrécissent en mort subite.
+- Nouvelle page `/galerie` : chaque élément de l'habillage avec des données inventées, dans les deux formats et pour chaque thème, sans toucher au match ni à l'antenne. Elle sert à juger un thème et m'a servi à vérifier le vertical par captures.
+- Corrigé au passage : sur l'avant-match en 16:9, le nom de l'équipe 1 passait sous le « vs » (largeur des deux moitiés mal comptée).
+- Vérifié : 50 tests, captures de tous les éléments en 9:16 et d'un échantillon en 16:9.
+- Pas vérifié : le rendu dans vMix ou OBS, et la position réelle de l'interface de TikTok.
+- Toujours ouvert : comment produire le flux vertical en même temps que le 16:9 (voir le README).

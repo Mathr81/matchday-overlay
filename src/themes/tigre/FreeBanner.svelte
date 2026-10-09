@@ -1,14 +1,15 @@
 <script lang="ts">
   import gsap from 'gsap';
   import qrcode from 'qrcode-generator';
-  import { onMount } from 'svelte';
+  import { getContext, onMount } from 'svelte';
   import type { Banner } from '../../shared/types';
-  import { letters, OUT } from './motion';
+  import { fit, letters, OUT } from './motion';
   import './tigre.css';
 
   // Bandeau libre : reste affiché tant qu'on ne le retire pas. Avec un lien, un QR code est posé à gauche.
   let { banner, leaving, ongone }: { banner: Banner; leaving: boolean; ongone: () => void } = $props();
 
+  const tall = getContext<boolean>('tall') ?? false;
   let root: HTMLDivElement;
   let tl: gsap.core.Timeline | undefined;
 
@@ -53,7 +54,12 @@
   });
 </script>
 
-<div class="tigre mo free" bind:this={root}>
+<div
+  class="tigre mo free"
+  bind:this={root}
+  style:--fs="{tall ? fit(banner.title, 50, 1250) : 50}px"
+  style:--fs2="{tall ? Math.max(15, fit(banner.subtitle ?? '', 21, 1500)) : 21}px"
+>
   {#if qr}
     <div class="qr"><svg viewBox="-2 -2 {qr.size + 4} {qr.size + 4}" shape-rendering="crispEdges"><path d={qr.path} /></svg></div>
   {/if}
@@ -97,7 +103,7 @@
     padding: 0 64px 0 56px;
     display: flex;
     align-items: center;
-    font-size: 50px;
+    font-size: var(--fs);
     white-space: nowrap;
   }
   .claws {
@@ -133,10 +139,21 @@
     padding: 0 34px 0 30px;
     display: inline-flex;
     align-items: center;
-    font-size: 21px;
+    font-size: var(--fs2);
     font-weight: 800;
     letter-spacing: 0.08em;
     --wd: 85;
     white-space: nowrap;
+  }
+  /* Vertical : le QR code passe au-dessus du texte. */
+  :global(.tall) .free {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  :global(.tall) .qr {
+    width: 190px;
+    height: 190px;
+    margin-left: 30px;
   }
 </style>

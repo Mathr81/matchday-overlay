@@ -13,6 +13,7 @@
   let index = $state(-1);
   let speed = $state(1);
   let error = $state('');
+  let vertical = $state(false);
   // Change à chaque lancement ou arrêt : une exécution en cours s'aperçoit qu'elle n'est plus la bonne.
   let run = 0;
 
@@ -110,8 +111,13 @@
     </p>
   </aside>
   <section>
-    <iframe title="Aperçu de l'overlay" src="/overlay/16x9?bg"></iframe>
-    <p>Aperçu de l'overlay. L'entrée vMix ou OBS montre la même chose au même moment.</p>
+    {#key vertical}
+      <iframe class:vertical title="Aperçu de l'overlay" src="/overlay/{vertical ? '9x16' : '16x9'}?bg"></iframe>
+    {/key}
+    <p>
+      Aperçu de l'overlay. L'entrée vMix ou OBS montre la même chose au même moment.
+      <button class="link" onclick={() => (vertical = !vertical)}>{vertical ? 'Voir le 16:9' : 'Voir le format vertical'}</button>
+    </p>
   </section>
 </main>
 {/if}
@@ -198,6 +204,19 @@
     border: 0;
     border-radius: 8px;
     background: #22382b;
+  }
+  iframe.vertical {
+    width: auto;
+    height: calc(100vh - 110px);
+    aspect-ratio: 9 / 16;
+    margin: 0 auto;
+  }
+  .link {
+    all: unset;
+    cursor: pointer;
+    color: #ef5407;
+    font-weight: 700;
+    margin-left: 8px;
   }
   section p {
     margin-top: 10px;

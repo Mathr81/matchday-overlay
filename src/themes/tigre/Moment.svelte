@@ -52,6 +52,7 @@
     width={70}
     x={320}
     crestX={1640}
+    tallFit={{ fontSize: 185, width: 62, x: 310, crestX: 1040 }}
     hold={3.6}
     {ondone}
   />

@@ -50,6 +50,8 @@ export interface Config {
   };
   /** Bandeaux enregistrés, proposés d'un appui dans le contrôle. */
   banners: Banner[];
+  /** Format vertical : hauteur laissée libre en haut et en bas pour l'interface de TikTok, en pixels sur 1920. */
+  vertical: { top: number; bottom: number };
 }
 
 // ---- journal ----

@@ -1,8 +1,8 @@
 <script lang="ts">
   import gsap from 'gsap';
-  import { onMount } from 'svelte';
+  import { getContext, onMount } from 'svelte';
   import type { Config } from '../../shared/types';
-  import { inkOn, leave, letters, OUT } from './motion';
+  import { fit, inkOn, leave, letters, OUT } from './motion';
   import './tigre.css';
 
   // Affiche du match : les deux équipes se rejoignent au centre, compte à rebours en dessous.
@@ -10,7 +10,8 @@
 
   const home = $derived(config.teams.home);
   const away = $derived(config.teams.away);
-  const size = (name: string) => Math.min(120, Math.round(540 / (name.length * 0.74)));
+  const tall = getContext<boolean>('tall') ?? false;
+  const size = (name: string) => Math.min(tall ? 104 : 120, Math.round(540 / (name.length * 0.74)));
   let root: HTMLDivElement;
   let tl: gsap.core.Timeline | undefined;
   let remaining = $state<number | null>(null);
@@ -55,7 +56,7 @@
   });
 </script>
 
-<div class="tigre panel" bind:this={root}>
+<div class="tigre panel" bind:this={root} style:--tfs="{tall ? fit(config.texts.title, 44, 1450) : 44}px">
   <div class="shade"></div>
   <div class="title para"><span>{config.texts.title}</span></div>
   <div class="subtitle para"><span>{config.texts.subtitle}</span></div>
@@ -88,8 +89,9 @@
     align-items: center;
     background: var(--o);
     color: var(--k);
-    font-size: 44px;
+    font-size: var(--tfs);
     --wd: 100;
+    white-space: nowrap;
   }
   .subtitle {
     position: absolute;
@@ -111,6 +113,7 @@
   .half {
     position: absolute;
     top: 330px;
+    box-sizing: border-box;
     width: 1020px;
     height: 400px;
     --s: 100px;
@@ -181,5 +184,60 @@
     --wd: 100;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+  }
+
+  /* Vertical : les deux équipes l'une sous l'autre, chacune venant de son bord, le « vs » entre elles. */
+  :global(.tall) .title {
+    left: 80px;
+    top: var(--safe-top);
+  }
+  :global(.tall) .subtitle {
+    left: 62px;
+    top: calc(var(--safe-top) + 82px);
+  }
+  :global(.tall) .half {
+    width: 1160px;
+    height: 280px;
+    --s: 70px;
+    gap: 34px;
+    justify-content: center;
+  }
+  :global(.tall) .home {
+    left: -160px;
+    top: calc(var(--safe-top) + 190px);
+    padding: 0 110px 0 200px;
+  }
+  :global(.tall) .away {
+    left: 80px;
+    top: calc(var(--safe-top) + 582px);
+    padding: 0 200px 0 110px;
+  }
+  :global(.tall) .half .crest {
+    width: 170px;
+    height: 170px;
+  }
+  :global(.tall) .vs {
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    top: calc(var(--safe-top) + 478px);
+    width: 250px;
+    height: 96px;
+    --s: 24px;
+    font-size: 44px;
+  }
+  :global(.tall) .count-label {
+    left: 44px;
+    right: 0;
+    margin: 0 auto;
+    width: max-content;
+    top: calc(var(--safe-top) + 916px);
+  }
+  :global(.tall) .count {
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    width: max-content;
+    top: calc(var(--safe-top) + 962px);
   }
 </style>

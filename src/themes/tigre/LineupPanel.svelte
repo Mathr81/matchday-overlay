@@ -1,8 +1,8 @@
 <script lang="ts">
   import gsap from 'gsap';
-  import { onMount } from 'svelte';
+  import { getContext, onMount } from 'svelte';
   import type { TeamConfig } from '../../shared/types';
-  import { inkOn, leave, OUT } from './motion';
+  import { fit, inkOn, leave, OUT } from './motion';
   import './tigre.css';
 
   // Composition : les lignes descendent en suivant l'inclinaison du thème, titulaires puis remplaçants.
@@ -10,6 +10,10 @@
 
   const starters = $derived(team.players.filter((p) => p.starter));
   const bench = $derived(team.players.filter((p) => !p.starter));
+  // Vertical : une seule colonne, les remplaçants à la suite des titulaires, toujours sur la même pente.
+  const tall = getContext<boolean>('tall') ?? false;
+  const drift = tall ? 13.75 : 15.5;
+  const benchDrift = tall ? 11.25 : 13;
   let root: HTMLDivElement;
   let tl: gsap.core.Timeline | undefined;
 
@@ -37,22 +41,22 @@
   });
 </script>
 
-<div class="tigre panel" bind:this={root} style:--team={team.color} style:--ink={inkOn(team.color)}>
+<div class="tigre panel" bind:this={root} style:--team={team.color} style:--ink={inkOn(team.color)} style:--hfs="{tall ? fit(team.name, 72, 900) : 92}px">
   <div class="shade"></div>
   <div class="tile para"><div class="crest" class:chip={team.logoOnLight}><img src={team.logo} alt="" /></div></div>
   <div class="heading para hatch"><span>Composition</span><b>{team.name}</b></div>
 
   <div class="starters">
     {#each starters as p, i (p.id)}
-      <div class="row para hatch" style:margin-left="{-i * 15.5}px"><span class="num">{p.number}</span><span>{p.name}</span></div>
+      <div class="row para hatch" style:margin-left="{-i * drift}px"><span class="num">{p.number}</span><span>{p.name}</span></div>
     {/each}
   </div>
 
   {#if bench.length}
-    <div class="bench">
+    <div class="bench" style:left={tall ? `${266 - starters.length * drift}px` : undefined} style:top={tall ? `calc(var(--safe-top) + ${174 + starters.length * 55}px)` : undefined}>
       <div class="label para"><span>Remplaçants</span></div>
       {#each bench as p, i (p.id)}
-        <div class="row para" style:margin-left="{-(i + 1) * 13}px"><span class="num">{p.number}</span><span>{p.name}</span></div>
+        <div class="row para" style:margin-left="{-(i + 1) * benchDrift}px"><span class="num">{p.number}</span><span>{p.name}</span></div>
       {/each}
     </div>
   {/if}
@@ -95,7 +99,7 @@
     color: var(--o);
   }
   .heading b {
-    font-size: 92px;
+    font-size: var(--hfs);
     white-space: nowrap;
   }
   .starters {
@@ -163,5 +167,46 @@
     width: 40px;
     text-align: right;
     opacity: 0.55;
+  }
+
+  :global(.tall) .tile {
+    left: 60px;
+    top: var(--safe-top);
+    width: 176px;
+    height: 132px;
+    --s: 33px;
+  }
+  :global(.tall) .tile .crest {
+    width: 100px;
+    height: 100px;
+  }
+  :global(.tall) .heading {
+    left: 210px;
+    top: var(--safe-top);
+    height: 132px;
+    --s: 33px;
+    padding: 0 76px 0 62px;
+  }
+  :global(.tall) .heading span {
+    font-size: 20px;
+  }
+  :global(.tall) .starters {
+    left: 270px;
+    top: calc(var(--safe-top) + 160px);
+  }
+  :global(.tall) .starters .row {
+    height: 50px;
+    --s: 12.5px;
+    min-width: 620px;
+    margin-bottom: 5px;
+    padding: 0 50px 0 30px;
+    font-size: 30px;
+  }
+  :global(.tall) .bench .row {
+    height: 40px;
+    --s: 10px;
+    min-width: 430px;
+    margin-bottom: 5px;
+    font-size: 22px;
   }
 </style>

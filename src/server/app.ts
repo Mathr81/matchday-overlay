@@ -51,9 +51,11 @@ export async function buildApp({ store, webDir, logosDir, uploadsDir, settings: 
 
   app.get('/', (_req, reply) => reply.redirect('/control'));
   app.get('/overlay/16x9', (_req, reply) => reply.sendFile('overlay/16x9.html'));
+  app.get('/overlay/9x16', (_req, reply) => reply.sendFile('overlay/9x16.html'));
   app.get('/control', (_req, reply) => reply.sendFile('control/index.html'));
   app.get('/simulation', (_req, reply) => reply.sendFile('simulation/index.html'));
   app.get('/admin', (_req, reply) => reply.sendFile('admin/index.html'));
+  app.get('/galerie', (_req, reply) => reply.sendFile('gallery/index.html'));
 
   app.post('/api/login', async (req, reply) => {
     // Un essai par seconde au plus après une erreur : assez pour décourager de deviner le code.
