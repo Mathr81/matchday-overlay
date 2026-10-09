@@ -6,6 +6,7 @@
   import { script, seconds } from './script';
 
   let snapshot = $state<Snapshot | null>(null);
+  let offset = 0;
   let connection: Connection | undefined;
   let needPin = $state(!savedToken());
   let running = $state(false);
@@ -15,7 +16,7 @@
   // Change à chaque lancement ou arrêt : une exécution en cours s'aperçoit qu'elle n'est plus la bonne.
   let run = 0;
 
-  const chapters = [...new Set(script.map((s) => s.chapter))];
+  const chapters = [...new Set(script.map((s) => s.chapter))].filter(Boolean);
   const chapter = $derived(script[index]?.chapter ?? '');
 
   onMount(() => {
@@ -24,7 +25,7 @@
   });
 
   function open() {
-    connection = connect('control', { onSnapshot: (s) => (snapshot = s), onDenied: () => (needPin = true) });
+    connection = connect('control', { onSnapshot: (s, o) => ((snapshot = s), (offset = o)), onDenied: () => (needPin = true) });
   }
 
   const sleep = (s: number) => new Promise((r) => setTimeout(r, (s * 1000) / speed));
@@ -43,10 +44,15 @@
     // On repart d'un match de simulation vide, à part du vrai match.
     await send({ type: 'simulation', on: false });
     await send({ type: 'simulation', on: true });
+    await send({ type: 'set_panel', panel: null });
+    await send({ type: 'set_banner', banner: null });
     for (index = 0; index < script.length && mine === run; index++) {
       const step = script[index];
       if (step.clock) await send({ type: 'set_clock', seconds: seconds(step.clock) });
       let command = step.command;
+      if (step.countdown && command.type === 'set_panel' && command.panel?.type === 'prematch') {
+        command = { ...command, panel: { type: 'prematch', kickoffAt: Date.now() + offset + (step.countdown * 1000) / speed } };
+      }
       if ('target' in command && command.target === '$lastGoal') command = { ...command, target: snapshot?.match.lastGoalId ?? '' };
       if (!(await send(command))) break;
       await sleep(step.wait);
@@ -60,6 +66,8 @@
     run++;
     running = false;
     index = -1;
+    await send({ type: 'set_panel', panel: null });
+    await send({ type: 'set_banner', banner: null });
     await send({ type: 'simulation', on: false });
   }
 </script>

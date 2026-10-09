@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { reduce } from '../shared/reducer';
+import { STAT_KEYS } from '../shared/types';
 import type {
   Ack,
   Command,
@@ -23,7 +24,9 @@ type Body<T> = T extends unknown ? Omit<T, 'id' | 'at'> : never;
 type RecordBody = Body<MatchEvent> | Body<VoidRecord> | Body<EditRecord>;
 type CueBody = Cue extends infer C ? (C extends unknown ? Omit<C, 'id' | 'minute'> : never) : never;
 
-const defaultDisplay = (): DisplayState => ({ scoreVisible: true });
+const defaultDisplay = (): DisplayState => ({ scoreVisible: true, panel: null, banner: null });
+const PANEL_TYPES = ['prematch', 'lineup', 'summary', 'stats', 'holding'];
+const text = (value: unknown, max: number) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 const other = (team: TeamId): TeamId => (team === 'home' ? 'away' : 'home');
 const isTeam = (team: unknown): team is TeamId => team === 'home' || team === 'away';
 const PATCH_KEYS: (keyof EventPatch)[] = ['team', 'kind', 'color', 'scorer', 'assist', 'player', 'in', 'out', 'minute'];
@@ -181,6 +184,22 @@ export class MatchStore {
         const already = this.records.some((r) => r.type === 'void' && r.target === cmd.target);
         if (!target || already) return refuse('Événement introuvable.');
         return record({ type: 'void', target: cmd.target });
+      }
+      case 'stat':
+        if (!isTeam(cmd.team) || !STAT_KEYS.includes(cmd.key) || (cmd.delta !== 1 && cmd.delta !== -1)) return refuse('Stat inconnue.');
+        if (cmd.delta === -1 && before.stats[cmd.team][cmd.key] === 0) return refuse('Déjà à zéro.');
+        return record({ type: 'stat', team: cmd.team, key: cmd.key, delta: cmd.delta });
+      case 'set_panel':
+        if (cmd.panel !== null && !PANEL_TYPES.includes(cmd.panel?.type)) return refuse('Panneau inconnu.');
+        if (cmd.panel?.type === 'lineup' && !isTeam(cmd.panel.team)) return refuse('Équipe inconnue.');
+        this.setDisplay({ ...this.display, panel: cmd.panel });
+        return this.changed(cmd.cid, ok);
+      case 'set_banner': {
+        const title = text(cmd.banner?.title, 80);
+        if (cmd.banner !== null && !title) return refuse('Il faut un titre.');
+        const banner = cmd.banner && { title, subtitle: text(cmd.banner.subtitle, 120) || undefined, qr: text(cmd.banner.qr, 300) || undefined };
+        this.setDisplay({ ...this.display, banner });
+        return this.changed(cmd.cid, ok);
       }
       case 'set_score_visible':
         this.setDisplay({ ...this.display, scoreVisible: cmd.visible === true });

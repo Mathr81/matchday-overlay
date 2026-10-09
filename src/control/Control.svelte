@@ -4,7 +4,9 @@
   import PinForm from '../client/PinForm.svelte';
   import { formatClock, isSentOff, periodLabel } from '../shared/clock';
   import { lineup, playerName } from '../shared/lineup';
-  import type { CommandBody, Config, EventPatch, GoalKind, Player, Snapshot, TeamId, TimelineItem } from '../shared/types';
+  import { statLabel } from '../shared/summary';
+  import { STAT_KEYS } from '../shared/types';
+  import type { Banner, CommandBody, Config, EventPatch, GoalKind, Panel, Player, Snapshot, TeamId, TimelineItem } from '../shared/types';
 
   type Field = 'scorer' | 'assist' | 'player' | 'in' | 'out';
   type Sheet =
@@ -13,6 +15,8 @@
     | { kind: 'sub'; team: TeamId; out?: string; step: 'out' | 'in' }
     | { kind: 'penalty'; team: TeamId }
     | { kind: 'missed'; team: TeamId }
+    | { kind: 'prematch' }
+    | { kind: 'motm'; team: TeamId }
     | { kind: 'event'; id: string }
     | { kind: 'field'; id: string; field: Field; team: TeamId };
 
@@ -28,6 +32,10 @@
   let undo = $state<{ label: string; target: string } | null>(null);
   let preview = $state(localStorage.getItem('matchday-preview') === '1');
   let clockInput = $state('');
+  let bannerTitle = $state('');
+  let bannerSubtitle = $state('');
+  // Mode correction des stats : un appui retire un au lieu d'ajouter.
+  let statMinus = $state(false);
   let connection: Connection | undefined;
   let errorTimer: ReturnType<typeof setTimeout>;
   let undoTimer: ReturnType<typeof setTimeout>;
@@ -115,6 +123,27 @@
     if (goal) send({ type: 'void_event', target: goal.id });
   }
 
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+  /** Affiche un panneau, ou le retire si c'est déjà celui à l'antenne. */
+  function togglePanel(panel: Panel) {
+    const on = snapshot?.display.panel?.type === panel.type && (panel.type !== 'lineup' || same(snapshot.display.panel, panel));
+    send({ type: 'set_panel', panel: on ? null : panel });
+  }
+
+  /** Avant-match, avec un compte à rebours de `minutes` (0 : sans). */
+  function prematch(minutes: number) {
+    send({ type: 'set_panel', panel: minutes ? { type: 'prematch', kickoffAt: Date.now() + offset + minutes * 60_000 } : { type: 'prematch' } });
+  }
+
+  function toggleBanner(banner: Banner) {
+    send({ type: 'set_banner', banner: same(snapshot?.display.banner, banner) ? null : banner });
+  }
+
+  function showFreeBanner() {
+    send({ type: 'set_banner', banner: { title: bannerTitle, subtitle: bannerSubtitle || undefined } });
+  }
+
   const name = (config: Config, id: string | undefined) => playerName(config, id) || 'sans nom';
 
   function describe(config: Config, t: TimelineItem): string {
@@ -134,7 +163,7 @@
 
   // Équipe dont on choisit un joueur : pour un csc, le buteur est dans l'équipe adverse.
   function pickTeam(s: Sheet): TeamId | null {
-    if (s.kind === 'event') return null;
+    if (s.kind === 'event' || s.kind === 'prematch') return null;
     if (s.kind === 'field') return s.team;
     return s.kind === 'goal' && s.goal === 'own' && s.step === 'scorer' ? other(s.team) : s.team;
   }
@@ -155,6 +184,8 @@
     if (s.kind === 'sub') return s.step === 'out' ? 'Qui sort ?' : 'Qui entre ?';
     if (s.kind === 'missed') return 'Penalty raté par…';
     if (s.kind === 'field') return 'Choisir le joueur';
+    if (s.kind === 'prematch') return 'Avant-match';
+    if (s.kind === 'motm') return 'Homme du match';
     if (s.kind === 'event') return 'Modifier';
     return 'Penalty';
   }
@@ -174,6 +205,7 @@
       if (s.step === 'out' && id) sheet = { ...s, out: id, step: 'in' };
       else send({ type: 'substitution', team: s.team, out: s.out, in: id }, `Remplacement ${team}`);
     } else if (s.kind === 'field') patch(s.id, { [s.field]: id ?? null });
+    else if (s.kind === 'motm') send({ type: 'set_panel', panel: id ? { type: 'summary', motm: { team: s.team, player: id } } : { type: 'summary' } });
   }
 
   const patch = (target: string, change: EventPatch) => send({ type: 'edit_event', target, patch: change });
@@ -282,6 +314,65 @@
     </section>
 
     <section class="block">
+      <h2>Panneaux</h2>
+      <div class="grid3">
+        <button class:primary={display.panel?.type === 'prematch'} onclick={() => (display.panel?.type === 'prematch' ? send({ type: 'set_panel', panel: null }) : (sheet = { kind: 'prematch' }))}>
+          Avant-match
+        </button>
+        {#each teams as team (team)}
+          <button class:primary={same(display.panel, { type: 'lineup', team })} onclick={() => togglePanel({ type: 'lineup', team })}>Compo {config.teams[team].code}</button>
+        {/each}
+        <button class:primary={display.panel?.type === 'summary'} onclick={() => togglePanel({ type: 'summary' })}>Résumé</button>
+        <button class:primary={display.panel?.type === 'stats'} onclick={() => togglePanel({ type: 'stats' })}>Stats</button>
+        <button class:primary={display.panel?.type === 'holding'} onclick={() => togglePanel({ type: 'holding' })}>Attente</button>
+      </div>
+      {#if display.panel?.type === 'summary'}
+        <div class="pair">
+          {#each teams as team (team)}
+            <button onclick={() => (sheet = { kind: 'motm', team })}>Homme du match {config.teams[team].code}</button>
+          {/each}
+        </div>
+      {/if}
+    </section>
+
+    <section class="block">
+      <h2>Bandeaux</h2>
+      {#each config.banners as b (b.title)}
+        <button class="event" class:primary={same(display.banner, b)} onclick={() => toggleBanner(b)}>
+          <span class="min">{b.qr ? 'QR' : ''}</span><i></i><span class="what">{b.title}</span>
+        </button>
+      {/each}
+      <form
+        class="free"
+        onsubmit={(ev) => {
+          ev.preventDefault();
+          showFreeBanner();
+        }}
+      >
+        <input bind:value={bannerTitle} placeholder="Titre" maxlength="80" aria-label="Titre du bandeau" />
+        <input bind:value={bannerSubtitle} placeholder="Sous-titre (facultatif)" maxlength="120" aria-label="Sous-titre du bandeau" />
+        <div class="pair">
+          <button class="primary" disabled={!bannerTitle.trim()}>Afficher</button>
+          <button type="button" disabled={!display.banner} onclick={() => send({ type: 'set_banner', banner: null })}>Retirer le bandeau</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="block">
+      <h2>Stats</h2>
+      {#each STAT_KEYS as key (key)}
+        <div class="statline">
+          <button disabled={statMinus && match.stats.home[key] === 0} onclick={() => send({ type: 'stat', team: 'home', key, delta: statMinus ? -1 : 1 })}>{match.stats.home[key]}</button>
+          <span>{statLabel(key)}</span>
+          <button disabled={statMinus && match.stats.away[key] === 0} onclick={() => send({ type: 'stat', team: 'away', key, delta: statMinus ? -1 : 1 })}>{match.stats.away[key]}</button>
+        </div>
+      {/each}
+      <button class="ghost" class:primary={statMinus} onclick={() => (statMinus = !statMinus)}>
+        {statMinus ? 'Mode correction : un appui retire 1' : 'Un appui ajoute 1 — passer en correction'}
+      </button>
+    </section>
+
+    <section class="block">
       <h2>Historique</h2>
       {#each history as t (t.id)}
         <button class="event" onclick={() => (sheet = { kind: 'event', id: t.id })}>
@@ -338,6 +429,13 @@
           <button class="primary" onclick={() => (sheet = { kind: 'goal', team: s.team, goal: 'penalty', step: 'scorer' })}>Marqué</button>
           <button onclick={() => (sheet = { kind: 'missed', team: s.team })}>Raté</button>
         </div>
+      {:else if s.kind === 'prematch'}
+        <div class="choices">
+          <button class="primary" onclick={() => prematch(0)}>Sans compte à rebours</button>
+          {#each [5, 10, 15, 30] as minutes (minutes)}
+            <button onclick={() => prematch(minutes)}>Coup d'envoi dans {minutes} min</button>
+          {/each}
+        </div>
       {:else if s.kind === 'event'}
         {#if event}
           <div class="choices">
@@ -371,7 +469,7 @@
           {/each}
         </div>
         <button class="primary wide" onclick={() => pick(config)}>
-          {s.kind === 'field' ? 'Aucun joueur' : s.kind === 'goal' && s.step === 'assist' ? 'Pas de passeur' : s.kind === 'sub' && s.step === 'in' ? 'Valider sans entrant' : 'Valider sans nom'}
+          {s.kind === 'field' || s.kind === 'motm' ? 'Aucun joueur' : s.kind === 'goal' && s.step === 'assist' ? 'Pas de passeur' : s.kind === 'sub' && s.step === 'in' ? 'Valider sans entrant' : 'Valider sans nom'}
         </button>
       {/if}
     </div>
@@ -698,6 +796,44 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .grid3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .grid3 button {
+    padding: 0 4px;
+    font-size: 14px;
+  }
+  .free {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .free input {
+    font: inherit;
+    color: inherit;
+    background: #1c1c1e;
+    border: 1px solid #333336;
+    border-radius: 10px;
+    padding: 14px;
+    min-width: 0;
+  }
+  .statline {
+    display: grid;
+    grid-template-columns: 76px 1fr 76px;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+  }
+  .statline span {
+    color: #c9c3b6;
+  }
+  .statline button {
+    font-size: 22px;
+    font-weight: 900;
+    min-height: 50px;
   }
   .clockfix {
     display: grid;

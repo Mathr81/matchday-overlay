@@ -49,3 +49,34 @@
   visibility: hidden;
   filter: drop-shadow(0 16px 26px rgba(0, 0, 0, 0.55));
 }
+
+/* Panneaux plein écran : voile sombre sur l'image, contenu par-dessus. */
+.tigre.panel {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+}
+.tigre.panel .shade {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(110% 100% at 50% 40%, rgba(8, 8, 8, 0.78), rgba(4, 4, 4, 0.93));
+}
+.tigre .crest {
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.tigre .crest img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+/* Logo sombre : posé sur un disque clair. */
+.tigre .crest.chip {
+  background: var(--w);
+  border-radius: 50%;
+}
+.tigre .crest.chip img {
+  max-width: 64%;
+  max-height: 64%;
+}

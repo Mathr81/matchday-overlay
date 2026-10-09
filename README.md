@@ -2,7 +2,7 @@
 
 Habillage de score animé pour les lives du BDT, piloté depuis un téléphone et affiché dans vMix ou OBS.
 
-État actuel : **étape 3 sur 9**. Le score, le chrono, les moments de match du thème Tigre (but, but refusé, penalty, cartons, remplacement), la page de contrôle complète et la simulation fonctionnent ; le reste est décrit dans `docs/superpowers/specs/2026-10-08-matchday-overlay-design.md`.
+État actuel : **étape 4 sur 9**. Le score, le chrono, les moments de match du thème Tigre, les panneaux (avant-match, compositions, résumé, stats, écran d'attente), les bandeaux libres, la page de contrôle et la simulation fonctionnent ; le reste est décrit dans `docs/superpowers/specs/2026-10-08-matchday-overlay-design.md`.
 
 ## Lancer
 
@@ -44,11 +44,23 @@ Si Windows demande d'autoriser Node.js sur le réseau, accepte pour les réseaux
 - **Aperçu** : « Voir l'aperçu » affiche l'overlay en direct dans la page.
 - Un joueur expulsé est grisé ; pour un remplacement, seuls les joueurs sur le terrain peuvent sortir et ceux du banc entrer.
 
+## Panneaux, bandeaux et stats
+
+Dans le contrôle, sous « Antenne » :
+
+- **Panneaux** : avant-match (avec ou sans compte à rebours), composition de chaque équipe, résumé, stats, écran d'attente. Un appui affiche, un second retire. Tous couvrent l'image et masquent le score, sauf les stats.
+- **Résumé** : il s'intitule tout seul « Mi-temps » ou « Fin du match » selon le chrono, et montre le score, les buteurs et les stats saisies. Une fois affiché, deux boutons permettent de désigner l'homme du match.
+- **Bandeaux** : ceux enregistrés dans `data/config.json` (section `banners`) se lancent d'un appui ; on peut aussi taper un titre et un sous-titre libres. Un bandeau avec un champ `qr` affiche le lien en QR code. Le bandeau s'efface tout seul pendant un but ou un carton, puis revient.
+- **Stats** : un appui sur un compteur ajoute 1 ; le mode correction retire 1. Les cartons sont comptés automatiquement.
+- Les textes des panneaux (nom de l'événement, message d'attente) sont dans la section `texts` de `data/config.json`.
+
+Ce qui est affiché survit à un rechargement de l'overlay et à un redémarrage du serveur.
+
 ## Simulation
 
 La page de simulation rejoue un match complet (buts, penalty, but refusé, cartons, deuxième jaune, remplacement, temps additionnel) pour juger les animations sans être sur le terrain. Elle montre un aperçu de l'overlay, et l'entrée vMix ou OBS affiche la même chose au même moment.
 
-Le vrai match est mis de côté pendant la simulation et revient intact avec « Quitter ». Un redémarrage du serveur revient aussi au vrai match.
+Le vrai match est mis de côté pendant la simulation et revient intact avec « Quitter ». Seule exception : le panneau et le bandeau à l'antenne sont retirés au lancement et à la sortie de la simulation. Un redémarrage du serveur revient aussi au vrai match.
 
 ## Ce qui est sauvegardé
 

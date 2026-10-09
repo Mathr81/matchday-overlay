@@ -142,6 +142,23 @@ describe('MatchStore', () => {
     expect(cues).toEqual([null]);
   });
 
+  it('counts stats, never below zero, and keeps panels and banners across a restart', () => {
+    const dir = tmp();
+    const store = new MatchStore(dir, defaultConfig());
+    store.execute(cmd({ type: 'stat', team: 'home', key: 'corners', delta: 1 }));
+    store.execute(cmd({ type: 'stat', team: 'home', key: 'corners', delta: 1 }));
+    store.execute(cmd({ type: 'stat', team: 'home', key: 'corners', delta: -1 }));
+    expect(store.match.stats.home.corners).toBe(1);
+    expect(store.execute(cmd({ type: 'stat', team: 'away', key: 'corners', delta: -1 })).ok).toBe(false);
+
+    store.execute(cmd({ type: 'set_panel', panel: { type: 'lineup', team: 'away' } }));
+    store.execute(cmd({ type: 'set_banner', banner: { title: '  Aux commentaires ', subtitle: '' } }));
+    expect(store.execute(cmd({ type: 'set_banner', banner: { title: ' ' } })).ok).toBe(false);
+    const again = new MatchStore(dir, defaultConfig()).snapshot().display;
+    expect(again.panel).toEqual({ type: 'lineup', team: 'away' });
+    expect(again.banner).toEqual({ title: 'Aux commentaires' });
+  });
+
   it('archives the journal on reset', () => {
     const dir = tmp();
     const store = new MatchStore(dir, defaultConfig());

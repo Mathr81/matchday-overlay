@@ -101,3 +101,28 @@ describe('periodLabel', () => {
     expect(at([{ id: '1', at: T0, type: 'period_started', period: 1 }, { id: '2', at: T0, type: 'period_ended' }])).toBe('Mi-temps');
   });
 });
+
+describe('summary', () => {
+  it('lists scorers with notes and counts a second yellow as a sending-off', async () => {
+    const { scorers, statRows } = await import('./summary');
+    const { defaultConfig } = await import('../server/config');
+    const config = defaultConfig();
+    const match = reduce(
+      [
+        { id: '1', at: T0, type: 'period_started', period: 1 },
+        { id: '2', at: T0 + 11 * MIN, type: 'goal', team: 'home', kind: 'normal', scorer: 'h9' },
+        { id: '3', at: T0 + 20 * MIN, type: 'goal', team: 'home', kind: 'own', scorer: 'a3' },
+        { id: '4', at: T0 + 30 * MIN, type: 'card', team: 'away', color: 'yellow', player: 'a4' },
+        { id: '5', at: T0 + 40 * MIN, type: 'card', team: 'away', color: 'yellow', player: 'a4' },
+      ],
+      format,
+    );
+    expect(scorers(config, match, 'home')).toEqual([
+      { name: 'Hugo Lambert', minute: "12'", note: '' },
+      { name: 'M. Martin', minute: "21'", note: 'csc' },
+    ]);
+    const rows = Object.fromEntries(statRows(match).map((r) => [r.label, r]));
+    expect(rows['Cartons jaunes'].away).toBe(2);
+    expect(rows['Expulsions'].away).toBe(1);
+  });
+});

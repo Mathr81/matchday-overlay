@@ -127,3 +127,18 @@ Retour du 9 octobre sur l'étape 2 : tout fonctionne.
 - Confirmation avant de terminer le match ; aperçu de l'antenne dans la page.
 - Vérifié : 26 tests ; parcours complet joué dans un navigateur (mauvais code refusé, bon code accepté, but avec passeur, changement de buteur, remplacement puis annulation, deuxième jaune, joueur expulsé grisé, chrono réglé, score corrigé).
 - Limite connue : le jeton dépend seulement du code PIN. C'est la protection basique demandée pour un réseau partagé, pas une sécurité forte.
+
+Retour du 9 octobre sur l'étape 3 : tout fonctionne.
+
+### Étape 4 — panneaux, bandeaux et stats (faite le 9 octobre)
+
+- État d'affichage étendu : un panneau et un bandeau libre, gardés sur disque. Quand le contenu change, l'ancien joue sa sortie avant que le nouveau entre.
+- Panneaux du thème Tigre : avant-match avec compte à rebours calé sur l'heure du serveur, composition (titulaires et remplaçants), résumé (score, buteurs, stats, homme du match), stats en direct, écran d'attente opaque à bandes défilantes.
+- Bandeaux libres avec QR code généré dans l'overlay, sans Internet. Modèles dans la configuration.
+- Stats : compteurs saisis (tirs, tirs cadrés, corners, fautes, hors-jeu) écrits dans le journal, cartons comptés automatiquement.
+- Règles d'affichage : un panneau plein écran masque le score ; le bandeau libre s'efface pendant un moment ou derrière un panneau.
+- Les animations suivent l'heure réelle même si l'affichage saccade (elles ne prennent plus de retard). Découvert parce que le navigateur de test tournait à 2 images par seconde.
+- Simulation complétée : avant-match, compositions, bandeau, stats, résumé de mi-temps et de fin de match.
+- Vérifié : 28 tests ; chaque panneau contrôlé par capture ; simulation complète sans erreur. Corrigé en route : nom d'équipe qui débordait sur l'avant-match, ligne de score trop large sur le résumé.
+- Pas encore vérifié dans vMix. Les captures montrent l'état final de chaque panneau, pas la fluidité des entrées et sorties.
+- Limite connue : le panneau et le bandeau sont communs au vrai match et à la simulation.

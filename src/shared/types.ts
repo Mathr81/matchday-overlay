@@ -22,10 +22,26 @@ export interface MatchFormat {
   periods: number;
 }
 
+/** Bandeau libre : commentateurs, message du BDT, sponsor… `qr` est un lien affiché en QR code. */
+export interface Banner {
+  title: string;
+  subtitle?: string;
+  qr?: string;
+}
+
 export interface Config {
   teams: Record<TeamId, TeamConfig>;
   format: MatchFormat;
   theme: 'tigre';
+  texts: {
+    /** Nom de l'événement, repris sur les panneaux. */
+    title: string;
+    subtitle: string;
+    /** Message de l'écran d'attente. */
+    holding: string;
+  };
+  /** Bandeaux enregistrés, proposés d'un appui dans le contrôle. */
+  banners: Banner[];
 }
 
 // ---- journal ----
@@ -51,8 +67,12 @@ export type MatchEvent = Stamped &
     | { type: 'substitution'; team: TeamId; out?: string; in?: string }
     | { type: 'penalty_awarded'; team: TeamId }
     | { type: 'penalty_missed'; team: TeamId; player?: string }
+    | { type: 'stat'; team: TeamId; key: StatKey; delta: 1 | -1 }
     | { type: 'added_time'; minutes: number }
   );
+
+export const STAT_KEYS = ['shots', 'onTarget', 'corners', 'fouls', 'offsides'] as const;
+export type StatKey = (typeof STAT_KEYS)[number];
 
 export type GoalKind = 'normal' | 'own' | 'penalty';
 
@@ -93,7 +113,7 @@ export interface ClockState {
   addedMinutes: number | null;
 }
 
-export type TimelineItem = Extract<MatchEvent, { team: TeamId }> & { minute: string };
+export type TimelineItem = Exclude<Extract<MatchEvent, { team: TeamId }>, { type: 'stat' }> & { minute: string };
 
 export interface MatchState {
   score: Record<TeamId, number>;
@@ -103,10 +123,22 @@ export interface MatchState {
   timeline: TimelineItem[];
   /** Clé « équipe:joueur ». */
   cards: Record<string, { yellow: number; red: boolean }>;
+  /** Compteurs saisis à la main. */
+  stats: Record<TeamId, Record<StatKey, number>>;
 }
+
+/** Panneau affiché tant qu'on ne le retire pas. Tous couvrent l'écran sauf les stats. */
+export type Panel =
+  | { type: 'prematch'; /** Heure du serveur du coup d'envoi, pour le compte à rebours. */ kickoffAt?: number }
+  | { type: 'lineup'; team: TeamId }
+  | { type: 'summary'; motm?: { team: TeamId; player: string } }
+  | { type: 'stats' }
+  | { type: 'holding' };
 
 export interface DisplayState {
   scoreVisible: boolean;
+  panel: Panel | null;
+  banner: Banner | null;
 }
 
 // ---- protocole ----
@@ -128,6 +160,9 @@ export type CommandBody =
   | { type: 'set_added_time'; minutes: number }
   | { type: 'void_event'; target: string }
   | { type: 'simulation'; on: boolean }
+  | { type: 'stat'; team: TeamId; key: StatKey; delta: 1 | -1 }
+  | { type: 'set_panel'; panel: Panel | null }
+  | { type: 'set_banner'; banner: Banner | null }
   | { type: 'set_score_visible'; visible: boolean }
   | { type: 'reset_match' };
 

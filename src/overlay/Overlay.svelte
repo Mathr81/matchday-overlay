@@ -1,9 +1,12 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { connect } from '../client/connection';
-  import type { Cue, Snapshot, TeamId } from '../shared/types';
+  import type { Banner, Cue, Panel as PanelData, Snapshot, TeamId } from '../shared/types';
+  import FreeBanner from '../themes/tigre/FreeBanner.svelte';
   import Moment from '../themes/tigre/Moment.svelte';
+  import Panel from '../themes/tigre/Panel.svelte';
   import Scorebug from '../themes/tigre/Scorebug.svelte';
+  import { Slot } from './slot.svelte';
 
   let snapshot = $state<Snapshot | null>(null);
   let offset = $state(0);
@@ -15,7 +18,22 @@
   // Score retenu pendant l'animation d'un but : il ne roule qu'au moment choisi par le thème.
   let heldScore = $state<Record<TeamId, number> | null>(null);
 
+  const panel = new Slot<PanelData>();
+  const banner = new Slot<Banner>();
+
   const match = $derived(snapshot && heldScore ? { ...snapshot.match, score: heldScore } : snapshot?.match);
+  // Un panneau plein écran prend la place du score ; les stats le laissent visible.
+  const covering = $derived(!!snapshot?.display.panel && snapshot.display.panel.type !== 'stats');
+
+  $effect(() => {
+    const want = snapshot?.display.panel ?? null;
+    untrack(() => panel.set(want));
+  });
+  // Le bandeau libre partage l'emplacement des moments : il s'efface pendant qu'un moment joue, ou derrière un panneau.
+  $effect(() => {
+    const want = current || covering || snapshot?.display.panel ? null : (snapshot?.display.banner ?? null);
+    untrack(() => banner.set(want));
+  });
 
   function next() {
     current = queue.shift() ?? null;
@@ -51,7 +69,17 @@
 
 <div class="stage" style:transform="scale({scale})">
   {#if snapshot && match}
-    <Scorebug config={snapshot.config} {match} visible={snapshot.display.scoreVisible} {offset} />
+    <Scorebug config={snapshot.config} {match} visible={snapshot.display.scoreVisible && !covering} {offset} />
+    {#if banner.shown}
+      {#key banner.key}
+        <FreeBanner banner={banner.shown} leaving={banner.leaving} ongone={banner.gone} />
+      {/key}
+    {/if}
+    {#if panel.shown}
+      {#key panel.key}
+        <Panel panel={panel.shown} config={snapshot.config} {match} {offset} leaving={panel.leaving} ongone={panel.gone} />
+      {/key}
+    {/if}
     {#if current}
       {#key current.id}
         <Moment cue={current} config={snapshot.config} hurry={queue.length > 0} onscore={() => (heldScore = null)} ondone={done} />

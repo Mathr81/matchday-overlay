@@ -1,5 +1,8 @@
 import { minuteLabel } from './clock';
-import type { ClockState, EventPatch, JournalRecord, MatchEvent, MatchFormat, MatchState } from './types';
+import { STAT_KEYS } from './types';
+import type { ClockState, EventPatch, JournalRecord, MatchEvent, MatchFormat, MatchState, StatKey } from './types';
+
+const emptyStats = () => Object.fromEntries(STAT_KEYS.map((k) => [k, 0])) as Record<StatKey, number>;
 
 export function initialState(): MatchState {
   return {
@@ -8,6 +11,7 @@ export function initialState(): MatchState {
     lastGoalId: null,
     timeline: [],
     cards: {},
+    stats: { home: emptyStats(), away: emptyStats() },
   };
 }
 
@@ -47,7 +51,7 @@ function stopClock(clock: ClockState, at: number) {
 
 function apply(state: MatchState, e: MatchEvent, format: MatchFormat) {
   const clock = state.clock;
-  if ('team' in e) state.timeline.push({ ...e, minute: e.minute ?? minuteLabel(clock, format, e.at) });
+  if ('team' in e && e.type !== 'stat') state.timeline.push({ ...e, minute: e.minute ?? minuteLabel(clock, format, e.at) });
   switch (e.type) {
     case 'period_started':
       state.clock = {
@@ -85,6 +89,9 @@ function apply(state: MatchState, e: MatchEvent, format: MatchFormat) {
       else card.red = true;
       break;
     }
+    case 'stat':
+      state.stats[e.team][e.key] = Math.max(0, state.stats[e.team][e.key] + e.delta);
+      break;
     case 'goal':
       state.score[e.team]++;
       state.lastGoalId = e.id;

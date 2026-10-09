@@ -35,6 +35,12 @@ export function defaultConfig(): Config {
     },
     format: { periodMinutes: 45, periods: 2 },
     theme: 'tigre',
+    texts: { title: 'Profs – Élèves', subtitle: 'Le match du BDT', holding: 'De retour dans un instant' },
+    banners: [
+      { title: 'Aux commentaires', subtitle: 'Prénom Nom et Prénom Nom' },
+      { title: 'Le BDT vous souhaite un bon match', subtitle: 'Bureau des Terminales · Barral 2027' },
+      { title: 'Soutenez le BDT', subtitle: 'Scannez pour participer à la cagnotte', qr: 'https://example.org/cagnotte' },
+    ],
   };
 }
 
@@ -51,7 +57,7 @@ export function loadConfig(dataDir: string): { config: Config; pin: string } {
   const saved: Partial<SavedConfig> = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
   const team = (id: TeamId) => ({ ...defaults.teams[id], ...saved.teams?.[id] });
   const { pin = newPin(), ...rest } = saved;
-  const config: Config = { ...defaults, ...rest, teams: { home: team('home'), away: team('away') }, format: { ...defaults.format, ...saved.format } };
+  const config: Config = { ...defaults, ...rest, teams: { home: team('home'), away: team('away') }, format: { ...defaults.format, ...saved.format }, texts: { ...defaults.texts, ...saved.texts } };
   if (saved.pin === undefined) {
     fs.mkdirSync(dataDir, { recursive: true });
     fs.writeFileSync(file, JSON.stringify({ pin, ...config }, null, 2));
