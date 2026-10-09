@@ -1,96 +1,219 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { connect, type Connection } from '../client/connection';
+  import { connect, savedToken, type Connection } from '../client/connection';
+  import PinForm from '../client/PinForm.svelte';
   import { formatClock, isSentOff, periodLabel } from '../shared/clock';
-  import type { CommandBody, GoalKind, Snapshot, TeamId } from '../shared/types';
+  import { lineup, playerName } from '../shared/lineup';
+  import type { CommandBody, Config, EventPatch, GoalKind, Player, Snapshot, TeamId, TimelineItem } from '../shared/types';
 
+  type Field = 'scorer' | 'assist' | 'player' | 'in' | 'out';
   type Sheet =
     | { kind: 'goal'; team: TeamId; goal: GoalKind; scorer?: string; step: 'scorer' | 'assist' }
     | { kind: 'card'; team: TeamId; color: 'yellow' | 'red' }
     | { kind: 'sub'; team: TeamId; out?: string; step: 'out' | 'in' }
     | { kind: 'penalty'; team: TeamId }
-    | { kind: 'missed'; team: TeamId };
+    | { kind: 'missed'; team: TeamId }
+    | { kind: 'event'; id: string }
+    | { kind: 'field'; id: string; field: Field; team: TeamId };
+
+  const UNDO_SECONDS = 10;
 
   let snapshot = $state<Snapshot | null>(null);
   let offset = 0;
   let online = $state(false);
+  let needPin = $state(!savedToken());
   let clockText = $state('00:00');
   let error = $state('');
   let sheet = $state<Sheet | null>(null);
-  let connection: Connection;
+  let undo = $state<{ label: string; target: string } | null>(null);
+  let preview = $state(localStorage.getItem('matchday-preview') === '1');
+  let clockInput = $state('');
+  let connection: Connection | undefined;
   let errorTimer: ReturnType<typeof setTimeout>;
+  let undoTimer: ReturnType<typeof setTimeout>;
 
   const phase = $derived(snapshot?.match.clock.phase ?? 'pre');
   const playing = $derived(phase === 'running' || phase === 'paused');
   const added = $derived(snapshot?.match.clock.addedMinutes ?? 0);
+  const history = $derived(snapshot ? [...snapshot.match.timeline].reverse() : []);
   const teams: TeamId[] = ['home', 'away'];
   const other = (team: TeamId): TeamId => (team === 'home' ? 'away' : 'home');
 
-  onMount(() => {
+  function open() {
+    connection?.close();
     connection = connect('control', {
       onSnapshot: (s, o) => {
         snapshot = s;
         offset = o;
       },
       onStatus: (o) => (online = o),
+      onDenied: () => (needPin = true),
     });
+  }
+
+  onMount(() => {
+    if (!needPin) open();
     const id = setInterval(() => {
       if (snapshot) clockText = formatClock(snapshot.match.clock, snapshot.config.format, Date.now() + offset);
     }, 200);
     return () => {
       clearInterval(id);
-      connection.close();
+      connection?.close();
     };
   });
 
-  async function send(body: CommandBody) {
+  function fail(message: string) {
+    error = message;
+    clearTimeout(errorTimer);
+    errorTimer = setTimeout(() => (error = ''), 4000);
+  }
+
+  /** Envoie une commande. Avec `label`, propose ensuite de l'annuler pendant quelques secondes. */
+  async function send(body: CommandBody, label?: string) {
+    if (!connection) return;
     sheet = null;
     navigator.vibrate?.(15);
     const ack = await connection.send(body);
-    if (ack.ok) return;
-    error = ack.reason ?? 'Commande refusée.';
-    clearTimeout(errorTimer);
-    errorTimer = setTimeout(() => (error = ''), 4000);
+    if (!ack.ok) return fail(ack.reason ?? 'Commande refusée.');
+    if (!label) return;
+    undo = { label, target: ack.cid };
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(() => (undo = null), UNDO_SECONDS * 1000);
+  }
+
+  function undoLast() {
+    if (!undo) return;
+    const target = undo.target;
+    undo = null;
+    send({ type: 'void_event', target });
   }
 
   function reset() {
     if (confirm('Démarrer un nouveau match ? Le match en cours sera archivé.')) send({ type: 'reset_match' });
   }
 
-  // Équipe dont on choisit un joueur : pour un csc, le buteur est dans l'équipe adverse.
-  const pickTeam = (s: Sheet): TeamId => (s.kind === 'goal' && s.goal === 'own' && s.step === 'scorer' ? other(s.team) : s.team);
+  function endPeriod(config: Config) {
+    const last = (snapshot?.match.clock.period ?? 0) >= config.format.periods;
+    if (!last || confirm('Terminer le match ?')) send({ type: 'end_period' });
+  }
 
-  const sheetTitle = (s: Sheet): string => {
+  function togglePreview() {
+    preview = !preview;
+    localStorage.setItem('matchday-preview', preview ? '1' : '0');
+  }
+
+  function setClock() {
+    const m = clockInput.trim().match(/^(\d{1,3})(?::(\d{1,2}))?$/);
+    if (!m) return fail('Écris le temps comme 67:24.');
+    send({ type: 'set_clock', seconds: Number(m[1]) * 60 + Number(m[2] ?? 0) });
+    clockInput = '';
+  }
+
+  /** Retire un but à une équipe : annule son dernier but, sans annonce. */
+  function minusOne(team: TeamId) {
+    const goal = history.find((t) => t.type === 'goal' && t.team === team);
+    if (goal) send({ type: 'void_event', target: goal.id });
+  }
+
+  const name = (config: Config, id: string | undefined) => playerName(config, id) || 'sans nom';
+
+  function describe(config: Config, t: TimelineItem): string {
+    switch (t.type) {
+      case 'goal':
+        return `${t.kind === 'own' ? 'But csc' : t.kind === 'penalty' ? 'But sur penalty' : 'But'} · ${name(config, t.scorer)}`;
+      case 'card':
+        return `${t.color === 'yellow' ? 'Carton jaune' : 'Carton rouge'} · ${name(config, t.player)}`;
+      case 'substitution':
+        return `Remplacement · ${name(config, t.in)} pour ${name(config, t.out)}`;
+      case 'penalty_awarded':
+        return 'Penalty';
+      case 'penalty_missed':
+        return `Penalty raté · ${name(config, t.player)}`;
+    }
+  }
+
+  // Équipe dont on choisit un joueur : pour un csc, le buteur est dans l'équipe adverse.
+  function pickTeam(s: Sheet): TeamId | null {
+    if (s.kind === 'event') return null;
+    if (s.kind === 'field') return s.team;
+    return s.kind === 'goal' && s.goal === 'own' && s.step === 'scorer' ? other(s.team) : s.team;
+  }
+
+  /** Joueurs proposés : sur le terrain d'abord, banc ensuite ; pour un remplacement, seulement ceux qui ont du sens. */
+  function candidates(config: Config, s: Sheet, team: TeamId): { player: Player; bench: boolean }[] {
+    if (!snapshot) return [];
+    const { pitch, bench } = lineup(config, snapshot.match, team);
+    const on = pitch.map((player) => ({ player, bench: false }));
+    const off = bench.map((player) => ({ player, bench: true }));
+    if (s.kind === 'sub') return s.step === 'out' ? on : off;
+    return [...on, ...off];
+  }
+
+  function sheetTitle(s: Sheet): string {
     if (s.kind === 'goal') return s.step === 'assist' ? 'Passeur ?' : 'Buteur ?';
     if (s.kind === 'card') return s.color === 'yellow' ? 'Carton jaune pour…' : 'Carton rouge pour…';
     if (s.kind === 'sub') return s.step === 'out' ? 'Qui sort ?' : 'Qui entre ?';
     if (s.kind === 'missed') return 'Penalty raté par…';
+    if (s.kind === 'field') return 'Choisir le joueur';
+    if (s.kind === 'event') return 'Modifier';
     return 'Penalty';
-  };
+  }
 
   /** Un joueur a été touché, ou « sans nom » (id indéfini). */
-  function pick(id?: string) {
+  function pick(config: Config, id?: string) {
     const s = sheet;
     if (!s) return;
+    const team = config.teams['team' in s ? s.team : 'home'].name;
     if (s.kind === 'goal') {
       if (s.step === 'scorer' && id && s.goal === 'normal') sheet = { ...s, scorer: id, step: 'assist' };
-      else if (s.step === 'scorer') send({ type: 'goal', team: s.team, kind: s.goal, scorer: id });
-      else send({ type: 'goal', team: s.team, kind: s.goal, scorer: s.scorer, assist: id });
-    } else if (s.kind === 'card') send({ type: 'card', team: s.team, color: s.color, player: id });
-    else if (s.kind === 'missed') send({ type: 'penalty_missed', team: s.team, player: id });
+      else if (s.step === 'scorer') send({ type: 'goal', team: s.team, kind: s.goal, scorer: id }, `But ${team} · ${name(config, id)}`);
+      else send({ type: 'goal', team: s.team, kind: s.goal, scorer: s.scorer, assist: id }, `But ${team} · ${name(config, s.scorer)}`);
+    } else if (s.kind === 'card') send({ type: 'card', team: s.team, color: s.color, player: id }, `Carton ${s.color === 'yellow' ? 'jaune' : 'rouge'} · ${name(config, id)}`);
+    else if (s.kind === 'missed') send({ type: 'penalty_missed', team: s.team, player: id }, `Penalty raté · ${name(config, id)}`);
     else if (s.kind === 'sub') {
       if (s.step === 'out' && id) sheet = { ...s, out: id, step: 'in' };
-      else send({ type: 'substitution', team: s.team, out: s.out, in: id });
+      else send({ type: 'substitution', team: s.team, out: s.out, in: id }, `Remplacement ${team}`);
+    } else if (s.kind === 'field') patch(s.id, { [s.field]: id ?? null });
+  }
+
+  const patch = (target: string, change: EventPatch) => send({ type: 'edit_event', target, patch: change });
+
+  function editMinute(t: TimelineItem) {
+    const answer = prompt('Minute du fait de match', t.minute.replace("'", ''));
+    if (answer?.trim()) patch(t.id, { minute: `${answer.trim().replace(/'/g, '')}'` });
+  }
+
+  /** Champs « joueur » modifiables d'un fait de match, avec l'équipe où chercher. */
+  function fields(t: TimelineItem): { field: Field; label: string; team: TeamId }[] {
+    if (t.type === 'goal') {
+      const scorer = { field: 'scorer' as const, label: 'Changer le buteur', team: t.kind === 'own' ? other(t.team) : t.team };
+      return t.kind === 'normal' ? [scorer, { field: 'assist', label: 'Changer le passeur', team: t.team }] : [scorer];
     }
+    if (t.type === 'card' || t.type === 'penalty_missed') return [{ field: 'player', label: 'Changer le joueur', team: t.team }];
+    if (t.type === 'substitution')
+      return [
+        { field: 'in', label: "Changer l'entrant", team: t.team },
+        { field: 'out', label: 'Changer le sortant', team: t.team },
+      ];
+    return [];
   }
 </script>
 
-{#if snapshot}
+{#if needPin}
+  <PinForm
+    onok={() => {
+      needPin = false;
+      open();
+    }}
+  />
+{:else if snapshot}
   {@const { config, match, display } = snapshot}
   <main>
     <header>
       {#if snapshot.simulation}<div class="sim">Simulation — le vrai match n'est pas touché</div>{/if}
-      <div class="status" class:off={!online}>{online ? 'Connecté' : 'Hors ligne — reconnexion…'}</div>
+      <div class="status" class:off={!online}>
+        {online ? 'Connecté' : 'Hors ligne — reconnexion…'} · {display.scoreVisible ? 'score à l\'antenne' : 'score masqué'}
+      </div>
       <div class="score">
         <span class="code">{config.teams.home.code}</span>
         <b>{match.score.home}</b><i>–</i><b>{match.score.away}</b>
@@ -101,6 +224,10 @@
         <span>{periodLabel(match.clock, config.format)}{phase === 'paused' ? ' · en pause' : ''}</span>
       </div>
     </header>
+
+    {#if preview}
+      <iframe class="preview" title="Aperçu de l'antenne" src="/overlay/16x9?bg"></iframe>
+    {/if}
 
     <section class="teams">
       {#each teams as team (team)}
@@ -118,15 +245,6 @@
       {/each}
     </section>
 
-    <div class="pair">
-      <button class="ghost" disabled={!match.lastGoalId} onclick={() => match.lastGoalId && send({ type: 'disallow_goal', target: match.lastGoalId })}>
-        Refuser le dernier but
-      </button>
-      <button class="ghost" disabled={!match.lastGoalId} onclick={() => match.lastGoalId && send({ type: 'void_event', target: match.lastGoalId })}>
-        Corriger sans annonce
-      </button>
-    </div>
-
     <section class="block">
       <h2>Chrono</h2>
       {#if phase === 'pre' || phase === 'break'}
@@ -140,7 +258,7 @@
           {:else}
             <button class="primary" onclick={() => send({ type: 'resume_clock' })}>Reprendre</button>
           {/if}
-          <button onclick={() => send({ type: 'end_period' })}>Fin de période</button>
+          <button onclick={() => endPeriod(config)}>Fin de période</button>
         </div>
         <div class="stepper">
           <span>Temps additionnel</span>
@@ -155,9 +273,47 @@
 
     <section class="block">
       <h2>Antenne</h2>
-      <button class:primary={!display.scoreVisible} onclick={() => send({ type: 'set_score_visible', visible: !display.scoreVisible })}>
-        {display.scoreVisible ? 'Masquer le score' : 'Afficher le score'}
-      </button>
+      <div class="pair">
+        <button class:primary={!display.scoreVisible} onclick={() => send({ type: 'set_score_visible', visible: !display.scoreVisible })}>
+          {display.scoreVisible ? 'Masquer le score' : 'Afficher le score'}
+        </button>
+        <button onclick={togglePreview}>{preview ? "Cacher l'aperçu" : "Voir l'aperçu"}</button>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>Historique</h2>
+      {#each history as t (t.id)}
+        <button class="event" onclick={() => (sheet = { kind: 'event', id: t.id })}>
+          <span class="min">{t.minute}</span>
+          <i style:background={config.teams[t.team].color}></i>
+          <span class="what">{describe(config, t)}</span>
+        </button>
+      {:else}
+        <p class="done">Rien pour l'instant. Touche un événement pour le corriger ou l'annuler.</p>
+      {/each}
+    </section>
+
+    <section class="block">
+      <h2>Corrections sans annonce</h2>
+      {#each teams as team (team)}
+        <div class="stepper">
+          <span>Score {config.teams[team].name}</span>
+          <button disabled={match.score[team] <= 0} onclick={() => minusOne(team)}>−</button>
+          <b>{match.score[team]}</b>
+          <button onclick={() => send({ type: 'goal', team, silent: true })}>+</button>
+        </div>
+      {/each}
+      <form
+        class="clockfix"
+        onsubmit={(ev) => {
+          ev.preventDefault();
+          setClock();
+        }}
+      >
+        <input bind:value={clockInput} placeholder="Chrono, ex. 67:24" inputmode="numeric" aria-label="Nouveau temps du chrono" disabled={!playing} />
+        <button disabled={!playing || !clockInput}>Régler</button>
+      </form>
     </section>
 
     <button class="ghost danger" onclick={reset}>Nouveau match</button>
@@ -166,10 +322,11 @@
   {#if sheet}
     {@const s = sheet}
     {@const from = pickTeam(s)}
+    {@const event = s.kind === 'event' || s.kind === 'field' ? match.timeline.find((t) => t.id === s.id) : undefined}
     <div class="sheet">
       <div class="sheet-head">
         <div>
-          <small>{config.teams[s.team].name}</small>
+          <small>{event ? `${event.minute} · ${describe(config, event)}` : 'team' in s ? config.teams[s.team].name : ''}</small>
           <b>{sheetTitle(s)}</b>
         </div>
         <button class="ghost" onclick={() => (sheet = null)}>Fermer</button>
@@ -177,11 +334,27 @@
 
       {#if s.kind === 'penalty'}
         <div class="choices">
-          <button onclick={() => send({ type: 'penalty', team: s.team })}>Annoncer le penalty</button>
+          <button onclick={() => send({ type: 'penalty', team: s.team }, `Penalty ${config.teams[s.team].name}`)}>Annoncer le penalty</button>
           <button class="primary" onclick={() => (sheet = { kind: 'goal', team: s.team, goal: 'penalty', step: 'scorer' })}>Marqué</button>
           <button onclick={() => (sheet = { kind: 'missed', team: s.team })}>Raté</button>
         </div>
-      {:else}
+      {:else if s.kind === 'event'}
+        {#if event}
+          <div class="choices">
+            {#each fields(event) as f (f.field)}
+              <button onclick={() => (sheet = { kind: 'field', id: event.id, field: f.field, team: f.team })}>{f.label}</button>
+            {/each}
+            <button onclick={() => editMinute(event)}>Changer la minute</button>
+            <button onclick={() => patch(event.id, { team: other(event.team), scorer: null, assist: null, player: null, in: null, out: null })}>
+              Attribuer à {config.teams[other(event.team)].name}
+            </button>
+            {#if event.type === 'goal'}
+              <button onclick={() => send({ type: 'disallow_goal', target: event.id })}>Refuser ce but (annoncé à l'antenne)</button>
+            {/if}
+            <button class="red" onclick={() => send({ type: 'void_event', target: event.id })}>Supprimer sans annonce</button>
+          </div>
+        {/if}
+      {:else if from}
         {#if s.kind === 'goal' && s.step === 'scorer'}
           <div class="kinds">
             {#each [['normal', 'But'], ['penalty', 'Penalty'], ['own', 'Contre son camp']] as const as [kind, label] (kind)}
@@ -190,17 +363,25 @@
           </div>
         {/if}
         <div class="players">
-          {#each config.teams[from].players as p (p.id)}
+          {#each candidates(config, s, from) as { player: p, bench } (p.id)}
             {@const off = isSentOff(match.cards[`${from}:${p.id}`])}
-            <button class:bench={!p.starter} disabled={off || (s.kind === 'goal' && s.scorer === p.id) || (s.kind === 'sub' && s.out === p.id)} onclick={() => pick(p.id)}>
+            <button class:bench disabled={off || (s.kind === 'goal' && s.scorer === p.id)} onclick={() => pick(config, p.id)}>
               <b>{p.number}</b><span>{p.name}</span>
             </button>
           {/each}
         </div>
-        <button class="primary wide" onclick={() => pick()}>
-          {s.kind === 'goal' && s.step === 'assist' ? 'Pas de passeur' : s.kind === 'sub' && s.step === 'in' ? 'Valider sans entrant' : 'Valider sans nom'}
+        <button class="primary wide" onclick={() => pick(config)}>
+          {s.kind === 'field' ? 'Aucun joueur' : s.kind === 'goal' && s.step === 'assist' ? 'Pas de passeur' : s.kind === 'sub' && s.step === 'in' ? 'Valider sans entrant' : 'Valider sans nom'}
         </button>
       {/if}
+    </div>
+  {/if}
+
+  {#if undo && !sheet}
+    <div class="undo">
+      <span>{undo.label}</span>
+      <button onclick={undoLast}>Annuler</button>
+      <i style:animation-duration="{UNDO_SECONDS}s"></i>
     </div>
   {/if}
   {#if error}<div class="toast" role="alert">{error}</div>{/if}
@@ -221,7 +402,7 @@
   main {
     max-width: 520px;
     margin: 0 auto;
-    padding: 12px 14px calc(24px + env(safe-area-inset-bottom));
+    padding: 12px 14px calc(96px + env(safe-area-inset-bottom));
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -486,5 +667,96 @@
     text-align: center;
     padding: 14px;
     border-radius: 10px;
+  }
+  .preview {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 1px solid #333336;
+    border-radius: 10px;
+    pointer-events: none;
+  }
+  .event {
+    display: grid;
+    grid-template-columns: 52px 6px 1fr;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    text-align: left;
+    font-weight: 500;
+  }
+  .event .min {
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  .event i {
+    align-self: stretch;
+    margin: 8px 0;
+    border-radius: 3px;
+  }
+  .event .what {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .clockfix {
+    display: grid;
+    grid-template-columns: 1fr 120px;
+    gap: 8px;
+  }
+  .clockfix input {
+    font: inherit;
+    color: inherit;
+    background: #1c1c1e;
+    border: 1px solid #333336;
+    border-radius: 10px;
+    padding: 0 14px;
+    min-width: 0;
+  }
+  /* Annulation rapide : reste dix secondes après chaque action, la barre du bas se vide pendant ce temps. */
+  .undo {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    z-index: 4;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 8px 8px 16px;
+    background: #f3eee4;
+    color: #0a0a0a;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+  }
+  .undo span {
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .undo button {
+    background: #0a0a0a;
+    border-color: #0a0a0a;
+    color: #f3eee4;
+    min-height: 48px;
+    padding: 0 22px;
+  }
+  .undo i {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 4px;
+    width: 100%;
+    background: #ef5407;
+    transform-origin: 0 50%;
+    animation: drain linear forwards;
+  }
+  @keyframes drain {
+    to {
+      transform: scaleX(0);
+    }
   }
 </style>

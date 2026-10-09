@@ -7,7 +7,7 @@ import { loadConfig } from './config';
 import { MatchStore } from './store';
 
 const root = process.cwd();
-const dataDir = path.join(root, 'data');
+const dataDir = process.env.DATA_DIR || path.join(root, 'data');
 const webDir = path.join(root, 'dist', 'web');
 const port = Number(process.env.PORT) || 4455;
 
@@ -16,8 +16,9 @@ if (!fs.existsSync(webDir)) {
   process.exit(1);
 }
 
-const store = new MatchStore(dataDir, loadConfig(dataDir));
-const app = await buildApp({ store, webDir, logosDir: path.join(root, 'assets', 'logos') });
+const { config, pin } = loadConfig(dataDir);
+const store = new MatchStore(dataDir, config);
+const app = await buildApp({ store, webDir, logosDir: path.join(root, 'assets', 'logos'), pin });
 await app.listen({ port, host: '0.0.0.0' });
 
 const lan = Object.values(os.networkInterfaces())
@@ -30,6 +31,7 @@ console.log(`  Overlay 16:9 (vMix / OBS)  http://localhost:${port}/overlay/16x9`
 console.log(`  Contrôle (ce PC)           http://localhost:${port}/control`);
 console.log(`  Simulation                 http://localhost:${port}/simulation`);
 if (lan) console.log(`  Contrôle (téléphone)       http://${lan}:${port}/control`);
+console.log(`\n  Code PIN du contrôle       ${pin}   (modifiable dans data/config.json)`);
 console.log(`\n  Match repris : ${score.home} - ${score.away}, ${clock.phase === 'pre' ? 'pas encore commencé' : `période ${clock.period}`}`);
 if (store.skippedLines) console.log(`  Attention : ${store.skippedLines} ligne(s) illisible(s) ignorée(s) dans data/match.jsonl`);
 if (lan) {

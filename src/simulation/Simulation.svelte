@@ -1,11 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { connect, type Connection } from '../client/connection';
+  import { connect, savedToken, type Connection } from '../client/connection';
+  import PinForm from '../client/PinForm.svelte';
   import type { Snapshot } from '../shared/types';
   import { script, seconds } from './script';
 
   let snapshot = $state<Snapshot | null>(null);
-  let connection: Connection;
+  let connection: Connection | undefined;
+  let needPin = $state(!savedToken());
   let running = $state(false);
   let index = $state(-1);
   let speed = $state(1);
@@ -17,13 +19,18 @@
   const chapter = $derived(script[index]?.chapter ?? '');
 
   onMount(() => {
-    connection = connect('control', { onSnapshot: (s) => (snapshot = s) });
-    return () => connection.close();
+    if (!needPin) open();
+    return () => connection?.close();
   });
+
+  function open() {
+    connection = connect('control', { onSnapshot: (s) => (snapshot = s), onDenied: () => (needPin = true) });
+  }
 
   const sleep = (s: number) => new Promise((r) => setTimeout(r, (s * 1000) / speed));
 
   async function send(body: Parameters<Connection['send']>[0]) {
+    if (!connection) return false;
     const ack = await connection.send(body);
     if (!ack.ok) error = ack.reason ?? 'Commande refusée.';
     return ack.ok;
@@ -57,6 +64,14 @@
   }
 </script>
 
+{#if needPin}
+  <PinForm
+    onok={() => {
+      needPin = false;
+      open();
+    }}
+  />
+{:else}
 <main>
   <aside>
     <h1>Simulation</h1>
@@ -91,6 +106,7 @@
     <p>Aperçu de l'overlay. L'entrée vMix ou OBS montre la même chose au même moment.</p>
   </section>
 </main>
+{/if}
 
 <style>
   :global(html) {

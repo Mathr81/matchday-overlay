@@ -121,6 +121,27 @@ describe('MatchStore', () => {
     expect(store.snapshot()).toMatchObject({ simulation: false, match: { score: { home: 1, away: 0 } } });
   });
 
+  it('edits an event: changes the scorer, the team and the minute', () => {
+    const store = new MatchStore(tmp(), defaultConfig());
+    store.execute(cmd({ type: 'start_period' }));
+    store.execute(cmd({ type: 'goal', team: 'home', scorer: 'h9', assist: 'h10' }, 'g1'));
+    store.execute(cmd({ type: 'edit_event', target: 'g1', patch: { scorer: 'h7', assist: null, minute: "12'" } }));
+    expect(store.match.timeline[0]).toMatchObject({ scorer: 'h7', minute: "12'" });
+    expect(store.match.timeline[0]).not.toHaveProperty('assist');
+    store.execute(cmd({ type: 'edit_event', target: 'g1', patch: { team: 'away' } }));
+    expect(store.match.score).toEqual({ home: 0, away: 1 });
+    expect(store.execute(cmd({ type: 'edit_event', target: 'nope', patch: { team: 'away' } })).ok).toBe(false);
+  });
+
+  it('adds a silent goal without any animation cue', () => {
+    const store = new MatchStore(tmp(), defaultConfig());
+    const cues: unknown[] = [];
+    store.subscribe((cue) => cues.push(cue));
+    store.execute(cmd({ type: 'goal', team: 'home', silent: true }));
+    expect(store.match.score.home).toBe(1);
+    expect(cues).toEqual([null]);
+  });
+
   it('archives the journal on reset', () => {
     const dir = tmp();
     const store = new MatchStore(dir, defaultConfig());
@@ -137,12 +158,14 @@ describe('WebSocket', () => {
 
   async function start() {
     const store = new MatchStore(tmp(), defaultConfig());
-    const app = await buildApp({ store, webDir: tmp(), logosDir: tmp() });
+    const app = await buildApp({ store, webDir: tmp(), logosDir: tmp(), pin: '4321' });
+    const login = await app.inject({ method: 'POST', url: '/api/login', payload: { pin: '4321' } });
+    const token = login.json().token as string;
     await app.listen({ port: 0, host: '127.0.0.1' });
     close = () => app.close();
     const { port } = app.server.address() as { port: number };
     const open = (role: string) => {
-      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?role=${role}`);
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?role=${role}&token=${role === 'control' ? token : ''}`);
       const inbox: ServerMessage[] = [];
       const waiters: ((m: ServerMessage) => void)[] = [];
       ws.on('message', (raw) => {
@@ -155,8 +178,16 @@ describe('WebSocket', () => {
       const send = (body: CommandBody) => ws.send(JSON.stringify({ type: 'command', command: cmd(body) }));
       return { next, send };
     };
-    return { open, store };
+    return { open, store, app, port };
   }
+
+  it('gives a token only for the right PIN, and closes a control socket without it', async () => {
+    const { app, port } = await start();
+    expect((await app.inject({ method: 'POST', url: '/api/login', payload: { pin: '0000' } })).statusCode).toBe(401);
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?role=control&token=nope`);
+    const code = await new Promise((res) => ws.on('close', res));
+    expect(code).toBe(4401);
+  });
 
   it('sends a snapshot on connect and broadcasts changes to every page', async () => {
     const { open } = await start();

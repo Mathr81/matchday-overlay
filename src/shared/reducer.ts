@@ -1,5 +1,5 @@
 import { minuteLabel } from './clock';
-import type { ClockState, JournalRecord, MatchEvent, MatchFormat, MatchState } from './types';
+import type { ClockState, EventPatch, JournalRecord, MatchEvent, MatchFormat, MatchState } from './types';
 
 export function initialState(): MatchState {
   return {
@@ -14,14 +14,29 @@ export function initialState(): MatchState {
 /** Recalcule tout l'état du match à partir du journal. */
 export function reduce(records: JournalRecord[], format: MatchFormat): MatchState {
   const voided = new Set<string>();
-  for (const r of records) if (r.type === 'void') voided.add(r.target);
+  const patches = new Map<string, EventPatch>();
+  for (const r of records) {
+    if (r.type === 'void') voided.add(r.target);
+    else if (r.type === 'edit') patches.set(r.target, { ...patches.get(r.target), ...r.patch });
+  }
 
   const state = initialState();
   for (const r of records) {
-    if (r.type === 'void' || voided.has(r.id)) continue;
-    apply(state, r, format);
+    if (r.type === 'void' || r.type === 'edit' || voided.has(r.id)) continue;
+    const patch = patches.get(r.id);
+    apply(state, patch ? patched(r, patch) : r, format);
   }
   return state;
+}
+
+/** Applique une correction : un champ mis à null est retiré (joueur effacé). */
+function patched(event: MatchEvent, patch: EventPatch): MatchEvent {
+  const out: Record<string, unknown> = { ...event };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) delete out[key];
+    else out[key] = value;
+  }
+  return out as unknown as MatchEvent;
 }
 
 function stopClock(clock: ClockState, at: number) {
@@ -32,7 +47,7 @@ function stopClock(clock: ClockState, at: number) {
 
 function apply(state: MatchState, e: MatchEvent, format: MatchFormat) {
   const clock = state.clock;
-  if ('team' in e) state.timeline.push({ ...e, minute: minuteLabel(clock, format, e.at) });
+  if ('team' in e) state.timeline.push({ ...e, minute: e.minute ?? minuteLabel(clock, format, e.at) });
   switch (e.type) {
     case 'period_started':
       state.clock = {

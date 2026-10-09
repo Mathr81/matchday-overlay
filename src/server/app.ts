@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import Fastify from 'fastify';
@@ -10,10 +11,28 @@ export interface AppOptions {
   /** Pages construites par Vite. */
   webDir: string;
   logosDir: string;
+  /** Code demandé par les pages de contrôle et de simulation. */
+  pin: string;
 }
 
-export async function buildApp({ store, webDir, logosDir }: AppOptions) {
+/** Fermeture du WebSocket quand le jeton manque ou n'est plus bon : la page redemande le code. */
+export const CLOSE_DENIED = 4401;
+
+export async function buildApp({ store, webDir, logosDir, pin }: AppOptions) {
   const app = Fastify();
+  // Le jeton dépend du code : changer le code déconnecte tous les appareils.
+  const token = crypto.createHash('sha256').update(`matchday:${pin}`).digest('hex');
+  let lastFailure = 0;
+
+  app.post('/api/login', async (req, reply) => {
+    // Un essai par seconde au plus après une erreur : assez pour décourager de deviner le code.
+    const wait = lastFailure + 1000 - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    if ((req.body as { pin?: unknown } | null)?.pin === pin) return { token };
+    lastFailure = Date.now();
+    return reply.code(401).send({ error: 'Code incorrect.' });
+  });
+
   await app.register(websocket);
   await app.register(fastifyStatic, { root: webDir });
   await app.register(fastifyStatic, { root: logosDir, prefix: '/logos/', decorateReply: false });
@@ -36,7 +55,9 @@ export async function buildApp({ store, webDir, logosDir }: AppOptions) {
 
   app.get('/ws', { websocket: true }, (socket, req) => {
     // Seule la page de contrôle peut envoyer des commandes ; les overlays sont en lecture seule.
-    const canCommand = (req.query as { role?: string }).role === 'control';
+    const query = req.query as { role?: string; token?: string };
+    const canCommand = query.role === 'control';
+    if (canCommand && query.token !== token) return socket.close(CLOSE_DENIED, 'denied');
     sockets.add(socket);
     socket.send(JSON.stringify(store.snapshot()));
     socket.on('close', () => sockets.delete(socket));

@@ -2,7 +2,7 @@
 
 Habillage de score animé pour les lives du BDT, piloté depuis un téléphone et affiché dans vMix ou OBS.
 
-État actuel : **étape 2 sur 9**. Le score, le chrono, les moments de match du thème Tigre (but, but refusé, penalty, cartons, remplacement) et la simulation fonctionnent ; le reste est décrit dans `docs/superpowers/specs/2026-10-08-matchday-overlay-design.md`.
+État actuel : **étape 3 sur 9**. Le score, le chrono, les moments de match du thème Tigre (but, but refusé, penalty, cartons, remplacement), la page de contrôle complète et la simulation fonctionnent ; le reste est décrit dans `docs/superpowers/specs/2026-10-08-matchday-overlay-design.md`.
 
 ## Lancer
 
@@ -16,6 +16,8 @@ Il faut Node.js 24 et pnpm.
 | Overlay 16:9 | `http://localhost:4455/overlay/16x9` |
 | Contrôle | `http://localhost:4455/control` |
 | Simulation | `http://localhost:4455/simulation` |
+
+Le contrôle et la simulation demandent un **code PIN** à quatre chiffres, affiché dans la console au démarrage. Il est tiré au hasard à la première utilisation et se change dans `data/config.json` (champ `pin`, puis redémarrer) ; le changer déconnecte tous les téléphones. Les overlays n'ont pas besoin de code et n'acceptent aucune commande.
 
 Pour voir l'overlay dans un navigateur ordinaire, ajoute `?bg` à l'adresse : il met un fond sombre à la place de la transparence.
 
@@ -32,6 +34,15 @@ Si Windows demande d'autoriser Node.js sur le réseau, accepte pour les réseaux
 1. Sources → + → Navigateur.
 2. URL : `http://localhost:4455/overlay/16x9`, largeur 1920, hauteur 1080.
 3. Laisse le CSS personnalisé par défaut (fond transparent).
+
+## Page de contrôle
+
+- **Deux colonnes, une par équipe** : but, cartons, remplacement, penalty. Chaque action ouvre la grille des joueurs ; « Valider sans nom » est toujours disponible.
+- **Annuler** : après chaque action, une barre reste dix secondes en bas de l'écran pour l'annuler d'un appui.
+- **Historique** : touche un événement pour changer le joueur, la minute ou l'équipe, refuser un but à l'antenne, ou le supprimer sans annonce.
+- **Corrections sans annonce** : boutons + et − sur le score, et réglage direct du chrono (par exemple `67:24`).
+- **Aperçu** : « Voir l'aperçu » affiche l'overlay en direct dans la page.
+- Un joueur expulsé est grisé ; pour un remplacement, seuls les joueurs sur le terrain peuvent sortir et ceux du banc entrer.
 
 ## Simulation
 

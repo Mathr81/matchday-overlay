@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Config, Player, TeamId } from '../shared/types';
@@ -37,17 +38,23 @@ export function defaultConfig(): Config {
   };
 }
 
-/** Lit data/config.json, ou l'écrit avec les valeurs par défaut s'il n'existe pas. */
-export function loadConfig(dataDir: string): Config {
+/** Ce qui est écrit dans data/config.json : la configuration publique, plus le code PIN qui ne quitte jamais le serveur. */
+export type SavedConfig = Config & { pin: string };
+
+const newPin = () => String(crypto.randomInt(0, 10_000)).padStart(4, '0');
+
+/** Lit data/config.json et le complète (ou le crée) quand il manque des champs. */
+export function loadConfig(dataDir: string): { config: Config; pin: string } {
   const file = path.join(dataDir, 'config.json');
   const defaults = defaultConfig();
-  if (!fs.existsSync(file)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-    fs.writeFileSync(file, JSON.stringify(defaults, null, 2));
-    return defaults;
-  }
   // Un fichier écrit par une version plus ancienne peut ne pas avoir tous les champs.
-  const saved = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<Config>;
+  const saved: Partial<SavedConfig> = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
   const team = (id: TeamId) => ({ ...defaults.teams[id], ...saved.teams?.[id] });
-  return { ...defaults, ...saved, teams: { home: team('home'), away: team('away') }, format: { ...defaults.format, ...saved.format } };
+  const { pin = newPin(), ...rest } = saved;
+  const config: Config = { ...defaults, ...rest, teams: { home: team('home'), away: team('away') }, format: { ...defaults.format, ...saved.format } };
+  if (saved.pin === undefined) {
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ pin, ...config }, null, 2));
+  }
+  return { config, pin };
 }

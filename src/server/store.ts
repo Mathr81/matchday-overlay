@@ -7,6 +7,8 @@ import type {
   Config,
   Cue,
   DisplayState,
+  EditRecord,
+  EventPatch,
   JournalRecord,
   MatchEvent,
   MatchState,
@@ -18,12 +20,13 @@ import type {
 import { Journal } from './journal';
 
 type Body<T> = T extends unknown ? Omit<T, 'id' | 'at'> : never;
-type RecordBody = Body<MatchEvent> | Body<VoidRecord>;
+type RecordBody = Body<MatchEvent> | Body<VoidRecord> | Body<EditRecord>;
 type CueBody = Cue extends infer C ? (C extends unknown ? Omit<C, 'id' | 'minute'> : never) : never;
 
 const defaultDisplay = (): DisplayState => ({ scoreVisible: true });
 const other = (team: TeamId): TeamId => (team === 'home' ? 'away' : 'home');
 const isTeam = (team: unknown): team is TeamId => team === 'home' || team === 'away';
+const PATCH_KEYS: (keyof EventPatch)[] = ['team', 'kind', 'color', 'scorer', 'assist', 'player', 'in', 'out', 'minute'];
 
 /** Tient l'état du match : applique les commandes, écrit le journal, prévient les abonnés. */
 export class MatchStore {
@@ -124,7 +127,7 @@ export class MatchStore {
         const scorerTeam = kind === 'own' ? other(cmd.team) : cmd.team;
         return record(
           { type: 'goal', team: cmd.team, kind, scorer: cmd.scorer, assist: cmd.assist },
-          { type: 'goal', team: cmd.team, kind, scorer: player(scorerTeam, cmd.scorer), assist: player(cmd.team, cmd.assist) },
+          cmd.silent ? undefined : { type: 'goal', team: cmd.team, kind, scorer: player(scorerTeam, cmd.scorer), assist: player(cmd.team, cmd.assist) },
         );
       }
       case 'disallow_goal': {
@@ -135,6 +138,14 @@ export class MatchStore {
           { type: 'void', target: cmd.target, disallowed: true },
           { type: 'goal_disallowed', team: goal.team, scorer: player(scorerTeam, goal.scorer) },
         );
+      }
+      case 'edit_event': {
+        if (!before.timeline.some((t) => t.id === cmd.target)) return refuse('Événement introuvable.');
+        const patch: EventPatch = {};
+        for (const key of PATCH_KEYS) if (cmd.patch && key in cmd.patch) (patch as Record<string, unknown>)[key] = cmd.patch[key];
+        if (patch.team !== undefined && !isTeam(patch.team)) return refuse('Équipe inconnue.');
+        if (Object.keys(patch).length === 0) return refuse('Rien à modifier.');
+        return record({ type: 'edit', target: cmd.target, patch });
       }
       case 'card': {
         if (!isTeam(cmd.team)) return refuse('Équipe inconnue.');
@@ -166,7 +177,7 @@ export class MatchStore {
         if (!Number.isInteger(cmd.minutes) || cmd.minutes < 0 || cmd.minutes > 30) return refuse('Durée invalide.');
         return record({ type: 'added_time', minutes: cmd.minutes });
       case 'void_event': {
-        const target = this.records.find((r) => r.id === cmd.target && r.type !== 'void');
+        const target = this.records.find((r) => r.id === cmd.target && r.type !== 'void' && r.type !== 'edit');
         const already = this.records.some((r) => r.type === 'void' && r.target === cmd.target);
         if (!target || already) return refuse('Événement introuvable.');
         return record({ type: 'void', target: cmd.target });

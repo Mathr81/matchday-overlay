@@ -114,3 +114,16 @@ Retour du 8 octobre sur l'étape 1 : tout fonctionne dans vMix, fluide.
 - Simulation : match scripté jusqu'à la fin du temps réglementaire (2 – 2), sur un journal à part.
 - Effectifs d'exemple inventés dans la configuration par défaut : à remplacer par les vrais noms.
 - Vérifié : 23 tests ; but, but adverse, deuxième jaune contrôlés par captures ; simulation complète sans erreur. Pas encore vérifié dans vMix.
+
+Retour du 9 octobre sur l'étape 2 : tout fonctionne.
+
+### Étape 3 — page de contrôle complète (faite le 9 octobre)
+
+- Code PIN : tiré au hasard et écrit dans `data/config.json` au premier lancement, affiché dans la console. Il donne un jeton gardé sur le téléphone ; sans jeton valide, le serveur ferme la connexion de contrôle. Le code n'est jamais envoyé aux pages.
+- Annulation rapide : barre de dix secondes après chaque action.
+- Historique : chaque fait de match peut être corrigé (joueur, minute, équipe), refusé à l'antenne pour un but, ou supprimé. Une correction est une ligne de plus dans le journal, l'original n'est jamais réécrit.
+- Corrections sans annonce : score + et −, réglage direct du chrono.
+- Composition suivie d'après les titulaires et les remplacements : seuls les joueurs sur le terrain peuvent sortir, seuls ceux du banc peuvent entrer, un expulsé est grisé.
+- Confirmation avant de terminer le match ; aperçu de l'antenne dans la page.
+- Vérifié : 26 tests ; parcours complet joué dans un navigateur (mauvais code refusé, bon code accepté, but avec passeur, changement de buteur, remplacement puis annulation, deuxième jaune, joueur expulsé grisé, chrono réglé, score corrigé).
+- Limite connue : le jeton dépend seulement du code PIN. C'est la protection basique demandée pour un réseau partagé, pas une sécurité forte.

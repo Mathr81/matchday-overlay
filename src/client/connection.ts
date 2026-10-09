@@ -10,6 +10,25 @@ interface Handlers {
   onSnapshot(snapshot: Snapshot, offset: number): void;
   onCue?(cue: Cue): void;
   onStatus?(online: boolean): void;
+  /** Le serveur refuse le jeton : il faut redemander le code. */
+  onDenied?(): void;
+}
+
+const CLOSE_DENIED = 4401;
+const TOKEN_KEY = 'matchday-token';
+
+export const savedToken = () => localStorage.getItem(TOKEN_KEY) ?? '';
+
+/** Échange le code PIN contre un jeton gardé sur l'appareil. Renvoie un message d'erreur, ou '' si c'est bon. */
+export async function login(pin: string): Promise<string> {
+  try {
+    const res = await fetch('/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin }) });
+    if (!res.ok) return 'Code incorrect.';
+    localStorage.setItem(TOKEN_KEY, (await res.json()).token);
+    return '';
+  } catch {
+    return 'Serveur injoignable.';
+  }
 }
 
 // crypto.randomUUID n'existe pas en http sur le réseau local (contexte non sécurisé).
@@ -17,7 +36,7 @@ const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).sli
 
 /** WebSocket qui se reconnecte seul et renvoie les commandes restées sans réponse. */
 export function connect(role: Role, handlers: Handlers): Connection {
-  const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws?role=${role}`;
+  const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws?role=${role}&token=${savedToken()}`;
   const pending = new Map<string, { command: Command; resolve: (ack: Ack) => void }>();
   let ws: WebSocket | null = null;
   let closed = false;
@@ -43,8 +62,12 @@ export function connect(role: Role, handlers: Handlers): Connection {
         pending.delete(message.cid);
       }
     };
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
       handlers.onStatus?.(false);
+      if (ev.code === CLOSE_DENIED) {
+        closed = true;
+        handlers.onDenied?.();
+      }
       if (closed) return;
       setTimeout(open, delay);
       delay = Math.min(delay * 2, 5000);

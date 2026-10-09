@@ -34,6 +34,8 @@ interface Stamped {
   id: string;
   /** Heure du serveur, en ms. */
   at: number;
+  /** Minute corrigée à la main ; sinon elle est calculée d'après le chrono. */
+  minute?: string;
 }
 
 export type MatchEvent = Stamped &
@@ -57,7 +59,22 @@ export type GoalKind = 'normal' | 'own' | 'penalty';
 /** Annule un événement. `disallowed` : but refusé, annoncé à l'antenne. */
 export type VoidRecord = Stamped & { type: 'void'; target: string; disallowed?: boolean };
 
-export type JournalRecord = MatchEvent | VoidRecord;
+/** Champs d'un fait de match qu'on peut corriger après coup. */
+export interface EventPatch {
+  team?: TeamId;
+  kind?: GoalKind;
+  color?: 'yellow' | 'red';
+  scorer?: string | null;
+  assist?: string | null;
+  player?: string | null;
+  in?: string | null;
+  out?: string | null;
+  minute?: string;
+}
+
+export type EditRecord = Stamped & { type: 'edit'; target: string; patch: EventPatch };
+
+export type JournalRecord = MatchEvent | VoidRecord | EditRecord;
 
 // ---- état dérivé ----
 
@@ -100,8 +117,10 @@ export type CommandBody =
   | { type: 'resume_clock' }
   | { type: 'end_period' }
   | { type: 'set_clock'; seconds: number }
-  | { type: 'goal'; team: TeamId; kind?: GoalKind; scorer?: string; assist?: string }
+  /** `silent` : correction du score, sans animation à l'antenne. */
+  | { type: 'goal'; team: TeamId; kind?: GoalKind; scorer?: string; assist?: string; silent?: boolean }
   | { type: 'disallow_goal'; target: string }
+  | { type: 'edit_event'; target: string; patch: EventPatch }
   | { type: 'card'; team: TeamId; color: 'yellow' | 'red'; player?: string }
   | { type: 'substitution'; team: TeamId; out?: string; in?: string }
   | { type: 'penalty'; team: TeamId }
