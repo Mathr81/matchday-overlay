@@ -33,10 +33,14 @@ export interface Banner {
   qr?: string;
 }
 
+/** Thèmes disponibles. */
+export const THEMES = ['tigre'] as const;
+export type ThemeId = (typeof THEMES)[number];
+
 export interface Config {
   teams: Record<TeamId, TeamConfig>;
   format: MatchFormat;
-  theme: 'tigre';
+  theme: ThemeId;
   texts: {
     /** Nom de l'événement, repris sur les panneaux. */
     title: string;

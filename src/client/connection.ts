@@ -34,6 +34,23 @@ export async function login(pin: string): Promise<string> {
 // crypto.randomUUID n'existe pas en http sur le réseau local (contexte non sécurisé).
 const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 
+/** Appel à l'API d'admin avec le jeton de l'appareil. Renvoie la réponse, ou `{ error }`. */
+export async function api<T>(path: string, body?: unknown): Promise<(T & { error?: undefined }) | { error: string; denied?: boolean }> {
+  try {
+    const res = await fetch(path, {
+      method: body === undefined ? 'GET' : 'POST',
+      headers: { 'x-token': savedToken(), ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const json = await res.json();
+    if (!res.ok) return { error: json.error ?? 'Erreur du serveur.', denied: res.status === 401 };
+    if (typeof json.token === 'string') localStorage.setItem(TOKEN_KEY, json.token);
+    return json;
+  } catch {
+    return { error: 'Serveur injoignable.' };
+  }
+}
+
 /** WebSocket qui se reconnecte seul et renvoie les commandes restées sans réponse. */
 export function connect(role: Role, handlers: Handlers): Connection {
   const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws?role=${role}&token=${savedToken()}`;

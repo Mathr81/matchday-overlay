@@ -46,7 +46,7 @@ export class MatchStore {
 
   constructor(
     private readonly dataDir: string,
-    readonly config: Config,
+    public config: Config,
     private readonly now: () => number = Date.now,
   ) {
     this.journal = new Journal(path.join(dataDir, 'match.jsonl'));
@@ -75,6 +75,13 @@ export class MatchStore {
       display: this.display,
       simulation: this.simulation,
     };
+  }
+
+  /** Remplace la configuration (page d'admin) : l'état est recalculé avec, et tous les écrans sont prévenus. */
+  setConfig(config: Config) {
+    this.config = config;
+    this.rev++;
+    for (const fn of this.listeners) fn(null);
   }
 
   /** `cue` est le signal d'animation produit par la commande, s'il y en a un. */

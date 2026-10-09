@@ -1,12 +1,12 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
   import { connect } from '../client/connection';
-  import type { Banner, Cue, Panel as PanelData, Snapshot, TeamId } from '../shared/types';
-  import FreeBanner from '../themes/tigre/FreeBanner.svelte';
-  import Moment from '../themes/tigre/Moment.svelte';
-  import Panel from '../themes/tigre/Panel.svelte';
-  import Scorebug from '../themes/tigre/Scorebug.svelte';
+  import type { Banner, Cue, Panel as PanelData, Snapshot, TeamId, ThemeId } from '../shared/types';
+  import { themes } from '../themes';
   import { Slot } from './slot.svelte';
+
+  /** Temps laissé aux éléments pour sortir avant de changer de thème. */
+  const THEME_EXIT_MS = 900;
 
   let snapshot = $state<Snapshot | null>(null);
   let offset = $state(0);
@@ -21,17 +21,36 @@
   const panel = new Slot<PanelData>();
   const banner = new Slot<Banner>();
 
+  // Changement de thème en direct : tout sort avec l'ancien thème, puis tout rentre avec le nouveau.
+  let themeId = $state<ThemeId | null>(null);
+  let switching = $state(false);
+  const theme = $derived(themeId ? themes[themeId] : null);
+
+  $effect(() => {
+    const want = snapshot?.config.theme;
+    if (!want || want === untrack(() => themeId) || untrack(() => switching)) return;
+    if (untrack(() => themeId) === null) {
+      themeId = want;
+      return;
+    }
+    switching = true;
+    setTimeout(() => {
+      themeId = snapshot?.config.theme ?? want;
+      switching = false;
+    }, THEME_EXIT_MS);
+  });
+
   const match = $derived(snapshot && heldScore ? { ...snapshot.match, score: heldScore } : snapshot?.match);
   // Un panneau plein écran prend la place du score ; les stats et les tirs au but le laissent visible.
   const covering = $derived(!!snapshot?.display.panel && snapshot.display.panel.type !== 'stats' && snapshot.display.panel.type !== 'shootout');
 
   $effect(() => {
-    const want = snapshot?.display.panel ?? null;
+    const want = switching ? null : (snapshot?.display.panel ?? null);
     untrack(() => panel.set(want));
   });
   // Le bandeau libre partage l'emplacement des moments : il s'efface pendant qu'un moment joue, ou derrière un panneau.
   $effect(() => {
-    const want = current || covering || snapshot?.display.panel ? null : (snapshot?.display.banner ?? null);
+    const want = switching || current || snapshot?.display.panel ? null : (snapshot?.display.banner ?? null);
     untrack(() => banner.set(want));
   });
 
@@ -68,23 +87,25 @@
 </script>
 
 <div class="stage" style:transform="scale({scale})">
-  {#if snapshot && match}
-    <Scorebug config={snapshot.config} {match} visible={snapshot.display.scoreVisible && !covering} {offset} />
-    {#if banner.shown}
-      {#key banner.key}
-        <FreeBanner banner={banner.shown} leaving={banner.leaving} ongone={banner.gone} />
-      {/key}
-    {/if}
-    {#if panel.shown}
-      {#key panel.key}
-        <Panel panel={panel.shown} config={snapshot.config} {match} {offset} leaving={panel.leaving} ongone={panel.gone} />
-      {/key}
-    {/if}
-    {#if current}
-      {#key current.id}
-        <Moment cue={current} config={snapshot.config} hurry={queue.length > 0} onscore={() => (heldScore = null)} ondone={done} />
-      {/key}
-    {/if}
+  {#if snapshot && match && theme}
+    {#key themeId}
+      <theme.Scorebug config={snapshot.config} {match} visible={snapshot.display.scoreVisible && !covering && !switching} {offset} />
+      {#if banner.shown}
+        {#key banner.key}
+          <theme.FreeBanner banner={banner.shown} leaving={banner.leaving} ongone={banner.gone} />
+        {/key}
+      {/if}
+      {#if panel.shown}
+        {#key panel.key}
+          <theme.Panel panel={panel.shown} config={snapshot.config} {match} {offset} leaving={panel.leaving} ongone={panel.gone} />
+        {/key}
+      {/if}
+      {#if current}
+        {#key current.id}
+          <theme.Moment cue={current} config={snapshot.config} hurry={queue.length > 0} onscore={() => (heldScore = null)} ondone={done} />
+        {/key}
+      {/if}
+    {/key}
   {/if}
 </div>
 

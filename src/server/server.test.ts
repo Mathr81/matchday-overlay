@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import type { Command, CommandBody, ServerMessage, Snapshot } from '../shared/types';
 import { buildApp } from './app';
-import { defaultConfig } from './config';
+import { defaultConfig, loadConfig, saveConfig, validateConfig } from './config';
 import { Journal } from './journal';
 import { MatchStore } from './store';
 
@@ -29,6 +29,35 @@ describe('Journal', () => {
     const { records, skipped } = journal.load();
     expect(records.map((r) => r.id)).toEqual(['a', 'c']);
     expect(skipped).toBe(1);
+  });
+});
+
+describe('config', () => {
+  it('fills in fields missing from an older file and keeps what was there', () => {
+    const dir = tmp();
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ pin: '2468', format: { periodMinutes: 30, periods: 2 }, teams: { home: { name: 'Terminales' } } }));
+    const { config, pin } = loadConfig(dir);
+    expect(pin).toBe('2468');
+    expect(config.teams.home).toMatchObject({ name: 'Terminales', code: 'ELV' });
+    expect(config.format).toMatchObject({ periodMinutes: 30, shootout: { enabled: true, kicks: 5 } });
+  });
+
+  it('round-trips through save and load', () => {
+    const dir = tmp();
+    const config = defaultConfig();
+    config.texts.title = 'Finale';
+    saveConfig(dir, config, '1357');
+    expect(loadConfig(dir)).toEqual({ config, pin: '1357' });
+  });
+
+  it('accepts the default configuration and explains what is wrong otherwise', () => {
+    expect(validateConfig(defaultConfig())).toEqual(defaultConfig());
+    const broken = defaultConfig();
+    broken.format.periodMinutes = 0;
+    expect(validateConfig(broken)).toContain('entre 1 et 90');
+    const noName = defaultConfig();
+    noName.teams.away.players[0].name = ' ';
+    expect(validateConfig(noName)).toContain('Équipe 2');
   });
 });
 
@@ -230,7 +259,8 @@ describe('WebSocket', () => {
 
   async function start() {
     const store = new MatchStore(tmp(), defaultConfig());
-    const app = await buildApp({ store, webDir: tmp(), logosDir: tmp(), pin: '4321' });
+    const saved: { pin?: string } = {};
+    const app = await buildApp({ store, webDir: tmp(), logosDir: tmp(), uploadsDir: tmp(), pin: '4321', onSave: (_c, pin) => (saved.pin = pin) });
     const login = await app.inject({ method: 'POST', url: '/api/login', payload: { pin: '4321' } });
     const token = login.json().token as string;
     await app.listen({ port: 0, host: '127.0.0.1' });
@@ -250,7 +280,7 @@ describe('WebSocket', () => {
       const send = (body: CommandBody) => ws.send(JSON.stringify({ type: 'command', command: cmd(body) }));
       return { next, send };
     };
-    return { open, store, app, port };
+    return { open, store, app, port, token, saved };
   }
 
   it('gives a token only for the right PIN, and closes a control socket without it', async () => {
@@ -274,6 +304,47 @@ describe('WebSocket', () => {
     const pushed = (await overlay.next()) as Snapshot;
     expect(pushed.type).toBe('snapshot');
     expect(pushed.match.score.home).toBe(1);
+  });
+
+  it('saves a new configuration from the admin, pushes it to every screen, and rejects a bad one', async () => {
+    const { open, store, app, token } = await start();
+    const overlay = open('overlay');
+    await overlay.next();
+    const config = defaultConfig();
+    config.teams.home.name = 'Terminales';
+    config.format.periodMinutes = 30;
+
+    expect((await app.inject({ method: 'POST', url: '/api/config', payload: { config, pin: '4321' } })).statusCode).toBe(401);
+    const ok = await app.inject({ method: 'POST', url: '/api/config', headers: { 'x-token': token }, payload: { config, pin: '4321' } });
+    expect(ok.statusCode).toBe(200);
+    expect(((await overlay.next()) as Snapshot).config.teams.home.name).toBe('Terminales');
+    expect(store.config.format.periodMinutes).toBe(30);
+
+    config.teams.home.color = 'orange';
+    const bad = await app.inject({ method: 'POST', url: '/api/config', headers: { 'x-token': token }, payload: { config, pin: '4321' } });
+    expect(bad.statusCode).toBe(400);
+    expect(bad.json().error).toContain('couleur');
+  });
+
+  it('changing the PIN disconnects phones and makes the old token useless', async () => {
+    const { open, app, token, saved, port } = await start();
+    const control = open('control');
+    await control.next();
+    const res = await app.inject({ method: 'POST', url: '/api/config', headers: { 'x-token': token }, payload: { config: defaultConfig(), pin: '9999' } });
+    expect(saved.pin).toBe('9999');
+    expect(res.json().token).not.toBe(token);
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?role=control&token=${token}`);
+    expect(await new Promise((r) => ws.on('close', r))).toBe(4401);
+  });
+
+  it('stores an uploaded logo and refuses anything that is not an image', async () => {
+    const { app, token } = await start();
+    const png = 'data:image/png;base64,' + Buffer.from('fake-png').toString('base64');
+    const ok = await app.inject({ method: 'POST', url: '/api/logo', headers: { 'x-token': token }, payload: { data: png } });
+    expect(ok.json().path).toMatch(/^\/uploads\/[0-9a-f]{16}\.png$/);
+    expect((await app.inject({ method: 'GET', url: ok.json().path })).statusCode).toBe(200);
+    const bad = await app.inject({ method: 'POST', url: '/api/logo', headers: { 'x-token': token }, payload: { data: 'data:text/html;base64,PGI+' } });
+    expect(bad.statusCode).toBe(400);
   });
 
   it('refuses commands coming from an overlay', async () => {

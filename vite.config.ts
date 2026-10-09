@@ -11,13 +11,15 @@ export default defineConfig({
     outDir: '../dist/web',
     emptyOutDir: true,
     rollupOptions: {
-      input: { overlay16x9: page('overlay/16x9.html'), control: page('control/index.html'), simulation: page('simulation/index.html') },
+      input: { overlay16x9: page('overlay/16x9.html'), control: page('control/index.html'), simulation: page('simulation/index.html'), admin: page('admin/index.html') },
     },
   },
   server: {
     proxy: {
       '/ws': { target: 'ws://localhost:4455', ws: true },
       '/logos': 'http://localhost:4455',
+      '/uploads': 'http://localhost:4455',
+      '/api': 'http://localhost:4455',
     },
   },
 });

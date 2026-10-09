@@ -156,3 +156,16 @@ Retour du 9 octobre sur l'étape 3 : tout fonctionne.
 - Vérifié : 36 tests, dont huit sur les prolongations et la séance ; séance et annonce contrôlées par capture ; simulation complète sans erreur.
 - Pas encore vérifié dans vMix, comme l'étape 4.
 - Pas fait : le nom du tireur. Le serveur l'accepte, mais le contrôle ne le demande pas et le panneau ne l'affiche pas.
+
+9 octobre : étape 5 enchaînée sans test de l'utilisateur, à revoir dans vMix avec l'étape 4.
+
+### Étape 6, première moitié — admin et changement de thème (faite le 9 octobre)
+
+- Page `/admin` protégée par le PIN : événement, équipes, logos, joueurs, format, bandeaux, code PIN. Enregistrement appliqué en direct à tous les écrans.
+- Le serveur vérifie tout ce qu'il reçoit et répond par un message qui nomme le champ fautif. Écriture du fichier par renommage, pour ne jamais laisser un fichier à moitié écrit.
+- Logos envoyés : nommés d'après leur contenu, rangés dans `data/uploads/`, types d'image seulement, 2 Mo au plus.
+- Changer le PIN ferme les connexions de contrôle et rend l'ancien jeton inutilisable.
+- Thèmes : registre `src/themes/index.ts` qui fixe ce qu'un thème fournit (score, moments, panneaux, bandeau libre). L'overlay sait changer de thème en direct : tout sort, bascule, tout rentre. Un seul thème existe pour l'instant, donc cette bascule n'a pas encore pu être essayée pour de vrai.
+- Vérifié : 42 tests ; parcours de l'admin joué dans un navigateur (modification, couleur invalide refusée avec son message, ajout d'un joueur, enregistrement relu côté serveur).
+- Pas vérifié : l'envoi d'un vrai fichier image depuis le sélecteur de fichiers (l'API est testée, pas le bouton).
+- Reste pour finir l'étape 6 : les thèmes Régie et Clair, chacun avec une étude de mouvement à valider avant d'être construit.
