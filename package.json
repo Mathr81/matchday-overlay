@@ -10,7 +10,8 @@
     "serve": "tsx src/server/main.ts",
     "test": "vitest run",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "exe": "node scripts/build-exe.mjs"
+    "exe": "node scripts/build-exe.mjs",
+    "companion": "npm --prefix companion-module install --no-audit --no-fund && npm --prefix companion-module run package"
   },
   "dependencies": {
     "@fastify/static": "^10.1.5",
@@ -30,7 +31,9 @@
     "@types/qrcode-terminal": "^0.12.2",
     "@types/ws": "^8.18.2",
     "esbuild": "^0.28.2",
+    "pe-library": "^2.0.1",
     "postject": "1.0.0-alpha.6",
+    "resedit": "^3.1.0",
     "svelte": "^5.57.2",
     "svelte-check": "^4.7.6",
     "tsx": "^4.23.15",

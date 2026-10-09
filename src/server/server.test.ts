@@ -453,6 +453,22 @@ describe('WebSocket', () => {
     expect((await app.inject('/api/do/goal/home?key=companion-key')).statusCode).toBe(404);
   });
 
+  it('takes match commands from the Companion module, except the ones that rewrite the match', async () => {
+    const { app, store } = await start();
+    const send = (payload: object, key = 'companion-key') => app.inject({ method: 'POST', url: `/api/command?key=${key}`, payload });
+    expect((await send({ type: 'start_period' }, 'wrong')).statusCode).toBe(401);
+    expect((await send({ type: 'start_period' })).json()).toMatchObject({ ok: true });
+    await send({ type: 'goal', team: 'home' });
+    await send({ type: 'stat', team: 'away', key: 'corners', delta: 1 });
+    expect(store.match.score).toEqual({ home: 1, away: 0 });
+    expect(store.match.stats.away.corners).toBe(1);
+    // Un refus du match revient tel quel, avec sa raison.
+    expect((await send({ type: 'resume_clock' })).json()).toMatchObject({ ok: false, reason: "Le chrono n'est pas en pause." });
+    expect((await send({ type: 'reset_match' })).statusCode).toBe(400);
+    expect((await send({ type: 'simulation', on: true })).statusCode).toBe(400);
+    expect(store.match.score.home).toBe(1);
+  });
+
   it('reports whether vMix answers and tests a single call from the admin', async () => {
     const { app, token, calls } = await start();
     const status = await app.inject({ url: '/api/vmix/status', headers: { 'x-token': token } });

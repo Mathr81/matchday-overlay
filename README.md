@@ -31,7 +31,11 @@ Si Windows demande d'autoriser Node.js sur le réseau, accepte pour les réseaux
 
 1. Add Input → Web Browser.
 2. URL : `http://localhost:4455/overlay/16x9`, largeur 1920, hauteur 1080.
-3. Place l'entrée dans un canal Overlay (ou en couche au-dessus de la caméra). Le fond est transparent.
+3. Sous la vignette de cette entrée, clique sur le petit bouton **1** de la rangée « 1 2 3 4 » : l'entrée passe sur le canal Overlay 1, par-dessus tout ce qui est à l'antenne, et y reste quand tu changes de caméra. Le fond est transparent.
+
+L'habillage reste sur ce canal pendant tout le live : c'est lui qui fait entrer et sortir le score, les panneaux et les bandeaux, pas vMix. Un nouvel appui sur **1** le retire d'un coup.
+
+Les déclencheurs vMix (plus bas) servent à autre chose : lancer un jingle, marquer un replay, etc. Garde le canal 1 pour l'habillage et donne-leur les canaux 2 à 4 ; une fonction `OverlayInput1In` avec une autre entrée prendrait la place de l'habillage.
 
 ## Ajouter l'overlay dans OBS
 
@@ -98,6 +102,26 @@ Dans la page d'admin, section « vMix ».
 
 ### Piloter l'affichage depuis Companion ou un Stream Deck
 
+#### Avec le module Companion (le plus simple)
+
+Le module `bdt-matchday-overlay` ajoute matchday-overlay à Companion comme n'importe quel appareil : actions à chercher par nom, retours d'état, variables et boutons tout faits.
+
+1. Récupère `bdt-matchday-overlay-1.0.0.tgz` sur la page des releases du dépôt (ou fabrique-le avec `pnpm companion`).
+2. Dans Companion (version 4 ou plus) : onglet **Modules**, bouton **Import module package**, choisis le fichier.
+3. Onglet **Connections** : ajoute « BDT Barral: Matchday Overlay ».
+4. Réglages de la connexion : l'adresse du PC de l'habillage (`127.0.0.1` si c'est le même), le port (4455) et la clé copiée depuis l'admin de matchday-overlay, section « Companion et Stream Deck ». La connexion passe au vert.
+
+Ce qu'il apporte :
+
+- **Actions** : score, panneaux, bandeaux enregistrés ou libres, thème ; coup d'envoi, pause, reprise, fin de période, temps additionnel ; but (avec le buteur choisi dans la liste des joueurs, ou sans nom), carton, penalty, compteurs de stats, fin du match, vainqueur ; tirs au but.
+- **Retours d'état** : score affiché, panneau ou bandeau à l'antenne, thème actif, chrono en marche ou en pause, équipe qui mène, équipe qui doit tirer, simulation en cours.
+- **Variables** : score, chrono, période, noms et sigles, stats, tirs au but, par exemple `$(matchday:clock)`.
+- **Boutons tout faits** (onglet Presets) : une soixantaine, aux couleurs des équipes.
+
+La remise à zéro, la simulation, les remplacements et les corrections restent sur la page de contrôle. Sur un Companion plus ancien que la version 4, dézippe le fichier dans le dossier « Developer modules » choisi dans la fenêtre de lancement de Companion.
+
+#### Sans module
+
 La section « Companion et Stream Deck » de l'admin liste des adresses prêtes à copier, avec leur clé. Dans Companion, ajoute une connexion « Generic HTTP » et une action GET par bouton.
 
 | Adresse | Effet |
@@ -107,7 +131,7 @@ La section « Companion et Stream Deck » de l'admin liste des adresses prêtes 
 | `/api/do/panel/summary` (ou `prematch`, `lineup-home`, `lineup-away`, `stats`, `holding`, `off`) | Afficher ou retirer un panneau |
 | `/api/do/theme/tigre` (ou `regie`, `clair`) | Changer de thème |
 
-Toutes prennent `?key=…`. Les buts, cartons et tirs au but ne passent pas par là : ils restent sur la page de contrôle, où l'on choisit le joueur.
+Toutes prennent `?key=…`. Les actions de match (buts, cartons, chrono) passent par le module.
 
 Pour les plans de caméra, les replays et le son, le module vMix de Companion fait déjà le travail : inutile de passer par cette app.
 
@@ -177,6 +201,7 @@ Le plus rapide : lancer la simulation avec l'overlay ouvert dans vMix, une fois 
 
 - `pnpm test` : tests de la logique de match et du serveur.
 - `pnpm check` : vérification des types.
-- `pnpm exe` : fabrique `release/matchday-overlay.exe` (le Node de la machine avec le serveur et les pages injectés dedans ; voir `scripts/build-exe.mjs`).
+- `pnpm exe` : fabrique `release/matchday-overlay.exe` (le Node de la machine avec le serveur et les pages injectés dedans ; voir `scripts/build-exe.mjs`). L'icône vient de `assets/icon/icon.ico`, assemblée par `scripts/make-ico.mjs` à partir de `icon.svg`.
+- `pnpm companion` : fabrique le module Companion (`companion-module/bdt-matchday-overlay-1.0.0.tgz`). Le dossier `companion-module/` est un paquet à part, avec ses propres dépendances.
 - `pnpm dev:server` et `pnpm dev:web` : serveur et pages avec rechargement à chaud (pages sur le port 5173).
 - Un thème est un dossier de `src/themes/` qui fournit quatre composants (score, moments, panneaux, bandeau libre) ; il s'ajoute dans `src/themes/index.ts`, `src/themes/names.ts` et la liste `THEMES` de `src/shared/types.ts`.

@@ -29,6 +29,27 @@ export interface AppOptions {
 /** Fermeture du WebSocket quand le jeton manque ou n'est plus bon : la page redemande le code. */
 export const CLOSE_DENIED = 4401;
 
+/** Commandes ouvertes à Companion : pas de remise à zéro, de simulation ni de correction du journal. */
+const REMOTE_COMMANDS = new Set([
+  'start_period',
+  'pause_clock',
+  'resume_clock',
+  'end_period',
+  'set_added_time',
+  'goal',
+  'card',
+  'penalty',
+  'penalty_missed',
+  'stat',
+  'end_match',
+  'start_shootout',
+  'shootout_kick',
+  'announce_winner',
+  'set_panel',
+  'set_banner',
+  'set_score_visible',
+]);
+
 const IMAGE_TYPES: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/svg+xml': 'svg' };
 
 export async function buildApp({ store, webDir, logosDir, uploadsDir, settings: initialSettings, onSave, fetcher }: AppOptions) {
@@ -151,6 +172,14 @@ export async function buildApp({ store, webDir, logosDir, uploadsDir, settings: 
       return { ok: true };
     }
     return reply.code(404).send({ ok: false, reason: 'Action inconnue.' });
+  });
+
+  // Le module Companion envoie les mêmes commandes que la page de contrôle, sauf celles qui effacent ou réécrivent le match.
+  app.post('/api/command', (req, reply) => {
+    if ((req.query as { key?: string }).key !== settings.apiKey) return reply.code(401).send({ ok: false, reason: 'Clé incorrecte.' });
+    const body = req.body as { type?: string } | null;
+    if (!body || typeof body.type !== 'string' || !REMOTE_COMMANDS.has(body.type)) return reply.code(400).send({ ok: false, reason: 'Commande inconnue.' });
+    return run(body as Parameters<typeof run>[0]);
   });
 
   // ---- temps réel ----

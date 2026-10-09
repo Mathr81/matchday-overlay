@@ -3,7 +3,9 @@ import { execFileSync, execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { build } from 'esbuild';
+import * as PE from 'pe-library';
 import { inject } from 'postject';
+import * as ResEdit from 'resedit';
 
 const out = 'dist/exe';
 const exe = 'release/matchday-overlay.exe';
@@ -44,5 +46,18 @@ execFileSync(process.execPath, ['--experimental-sea-config', `${out}/sea.json`],
 
 fs.copyFileSync(process.execPath, exe);
 await inject(exe, 'NODE_SEA_BLOB', fs.readFileSync(`${out}/sea.blob`), { sentinelFuse: FUSE });
+
+// L'icône et le nom affichés par Windows remplacent ceux de Node. À faire après l'injection : dans l'autre sens, elle échoue.
+const pe = PE.NtExecutable.from(fs.readFileSync(exe), { ignoreCert: true });
+const res = PE.NtExecutableResource.from(pe);
+const icons = ResEdit.Data.IconFile.from(fs.readFileSync('assets/icon/icon.ico')).icons.map((i) => i.data);
+for (const group of ResEdit.Resource.IconGroupEntry.fromEntries(res.entries)) ResEdit.Resource.IconGroupEntry.replaceIconsForResource(res.entries, group.id, group.lang, icons);
+for (const info of ResEdit.Resource.VersionInfo.fromEntries(res.entries)) {
+  for (const lang of info.getAllLanguagesForStringValues())
+    info.setStringValues(lang, { FileDescription: 'matchday-overlay', ProductName: 'matchday-overlay', InternalName: 'matchday-overlay', OriginalFilename: 'matchday-overlay.exe', CompanyName: 'BDT Barral' });
+  info.outputToResourceEntries(res.entries);
+}
+res.outputResource(pe);
+fs.writeFileSync(exe, Buffer.from(pe.generate()));
 
 console.log(`\n  ${exe}  (${Math.round(fs.statSync(exe).size / 1e6)} Mo, ${Object.keys(assets).length - 1} fichiers embarqués)`);

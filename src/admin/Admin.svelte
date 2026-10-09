@@ -259,7 +259,7 @@
     <section>
       <h2>Companion et Stream Deck</h2>
       <p class="hint">
-        Des adresses simples pour piloter l'affichage depuis Bitfocus Companion (action « HTTP GET ») ou tout autre outil. Les buts et les cartons restent sur la page de contrôle.
+        Le module Companion « Matchday Overlay » (fichier <code>.tgz</code> des releases du dépôt) demande cette clé et donne toutes les actions, buts et chrono compris. Sans module, ces adresses simples pilotent l'affichage par une action « HTTP GET ».
       </p>
       <div class="grid">
         <label>Clé<input bind:value={settings.apiKey} maxlength="64" /></label>

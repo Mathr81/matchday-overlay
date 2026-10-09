@@ -249,3 +249,12 @@ Demande : « un petit .exe ». `pnpm exe` fabrique `release/matchday-overlay.exe
 - Non signé : Windows peut afficher un avertissement au premier lancement.
 
 Vérifié : lancé depuis un dossier vide, toutes les pages, les logos et la connexion en direct répondent ; le deuxième lancement affiche le message de port déjà pris. Non vérifié : sur un PC sans Node installé (il ne devrait pas en avoir besoin, mais je n'en ai pas sous la main).
+
+## Icône de l'exe, module Companion
+
+- **Icône** : trois bandes inclinées (deux orange, une blanche) sur une tuile noire, reprises du thème Tigre. Dessinée dans `assets/icon/icon.svg`, rendue en sept tailles et assemblée en `.ico`. Elle est écrite dans l'exe avec le nom du produit, après l'injection du serveur (dans l'autre ordre, l'injection échoue).
+- **Module Companion** (`companion-module/`) : demandé pour chercher les actions par nom au lieu de coller des adresses. Il lit l'état du match par la même connexion que les overlays (lecture seule, sans clé) et envoie ses commandes à une nouvelle adresse, `POST /api/command`, protégée par la clé. Cette adresse accepte les commandes de match mais pas la remise à zéro, la simulation ni les corrections du journal : un bouton de Stream Deck ne doit pas pouvoir effacer un match.
+- Les menus (équipes, joueurs, bandeaux) et les boutons tout faits sont refaits quand la configuration change.
+- Bibliothèque `@companion-module/base` 1.12, pour rester compatible avec Companion 4.0 et suivants. L'outil d'empaquetage impose la licence MIT au module : le dossier `companion-module/` a donc son propre fichier LICENSE.
+
+Vérifié : le module empaqueté a tourné contre le serveur avec un faux Companion (même protocole) : clé fausse signalée, clé bonne acceptée, 22 actions, 8 retours d'état, 36 variables, 63 boutons ; un bout de match joué (coup d'envoi, but avec buteur, carton, stats, pause, panneau, bandeau, thème, temps additionnel, mi-temps) avec variables et retours d'état justes à chaque pas. Non vérifié : dans un vrai Companion, sur un vrai Stream Deck.

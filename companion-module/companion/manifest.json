@@ -1,0 +1,21 @@
+{
+  "id": "bdt-matchday-overlay",
+  "name": "bdt-matchday-overlay",
+  "shortname": "matchday",
+  "description": "Pilote l'habillage de match matchday-overlay : score, chrono, buts, cartons, panneaux, bandeaux, thèmes.",
+  "version": "0.0.0",
+  "license": "MIT",
+  "repository": "git+https://github.com/Mathr81/matchday-overlay.git",
+  "bugs": "https://github.com/Mathr81/matchday-overlay/issues",
+  "maintainers": [{ "name": "Mathr81", "email": "Mathr81@users.noreply.github.com" }],
+  "runtime": {
+    "type": "node22",
+    "api": "nodejs-ipc",
+    "apiVersion": "0.0.0",
+    "entrypoint": "../main.js"
+  },
+  "legacyIds": [],
+  "manufacturer": "BDT Barral",
+  "products": ["Matchday Overlay"],
+  "keywords": ["football", "score", "scoreboard", "overlay", "habillage", "vmix", "obs"]
+}
