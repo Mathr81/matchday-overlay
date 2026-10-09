@@ -1,0 +1,122 @@
+@import '@fontsource-variable/archivo/wdth.css';
+@import '@fontsource-variable/jetbrains-mono/index.css';
+
+/* Thème Régie : verre sombre, angles droits, un trait blanc qui se trace avant chaque élément.
+   Les couleurs d'équipe n'apparaissent qu'en liserés et en aplats courts. */
+.regie {
+  --bg: rgba(13, 15, 19, 0.95);
+  --bg2: #1b2028;
+  --tx: #f3f4f6;
+  --mut: #949ca9;
+  --hair: rgba(255, 255, 255, 0.13);
+  --ac: #d4ff3a;
+  --alert: #ff4548;
+  font-family: 'Archivo Variable', sans-serif;
+  font-weight: 700;
+  font-variation-settings: 'wdth' var(--wd, 82);
+  text-transform: uppercase;
+  line-height: 1;
+  color: var(--tx);
+}
+
+/* Trait de construction : il se trace, puis la surface se déplie à partir de lui. */
+.regie .rule {
+  height: 2px;
+  background: var(--tx);
+  transform-origin: 0 50%;
+}
+
+/* Surface : --r la déplie vers le bas (ou vers la droite avec .side). */
+.regie .sheet {
+  background: var(--bg);
+  clip-path: inset(0 0 calc((1 - var(--r, 1)) * 100%) 0);
+}
+.regie .sheet.side {
+  clip-path: inset(0 calc((1 - var(--r, 1)) * 100%) 0 0);
+}
+
+/* Texte masqué : son contenu (.rise) monte derrière le cache. */
+.regie .up {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+  padding: 0.1em 0.04em;
+  margin: -0.1em -0.04em;
+}
+.regie .rise {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.regie .mono {
+  font-family: 'JetBrains Mono Variable', monospace;
+  font-variation-settings: normal;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Petite étiquette espacée. */
+.regie .lab {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  --wd: 100;
+  color: var(--mut);
+}
+
+/* Logo : dans un disque clair s'il est sombre. */
+.regie .chip {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+}
+.regie .chip img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+.regie .chip.light {
+  background: #f3f4f6;
+}
+.regie .chip.light img {
+  max-width: 66%;
+  max-height: 66%;
+}
+
+/* Emplacement des moments : bas gauche. */
+.regie.mo {
+  position: absolute;
+  left: 64px;
+  bottom: 84px;
+  visibility: hidden;
+  filter: drop-shadow(0 14px 24px rgba(0, 0, 0, 0.5));
+}
+.tall .regie.mo {
+  left: 50px;
+  bottom: var(--safe-bottom);
+}
+
+/* Panneaux : voile sombre, contenu centré dans une colonne. */
+.regie.panel {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+}
+.regie.panel .shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(7, 9, 12, 0.82), rgba(7, 9, 12, 0.93));
+}
+.regie.panel .col {
+  position: absolute;
+  left: 50%;
+  top: 110px;
+  width: 1320px;
+  margin-left: -660px;
+}
+.tall .regie.panel .col {
+  top: var(--safe-top);
+  width: 980px;
+  margin-left: -490px;
+}

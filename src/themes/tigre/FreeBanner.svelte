@@ -1,8 +1,8 @@
 <script lang="ts">
   import gsap from 'gsap';
-  import qrcode from 'qrcode-generator';
   import { getContext, onMount } from 'svelte';
   import type { Banner } from '../../shared/types';
+  import { qrPath } from '../util';
   import { fit, letters, OUT } from './motion';
   import './tigre.css';
 
@@ -13,17 +13,7 @@
   let root: HTMLDivElement;
   let tl: gsap.core.Timeline | undefined;
 
-  /** Tracé SVG du QR code : un petit carré par module sombre. */
-  const qr = $derived.by(() => {
-    if (!banner.qr) return null;
-    const code = qrcode(0, 'M');
-    code.addData(banner.qr);
-    code.make();
-    const size = code.getModuleCount();
-    let path = '';
-    for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) if (code.isDark(r, c)) path += `M${c} ${r}h1v1h-1z`;
-    return { size, path };
-  });
+  const qr = $derived(banner.qr ? qrPath(banner.qr) : null);
 
   onMount(() => {
     const q = gsap.utils.selector(root);

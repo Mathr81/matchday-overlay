@@ -34,7 +34,7 @@ export interface Banner {
 }
 
 /** Thèmes disponibles. */
-export const THEMES = ['tigre'] as const;
+export const THEMES = ['tigre', 'regie'] as const;
 export type ThemeId = (typeof THEMES)[number];
 
 export interface Config {
