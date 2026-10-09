@@ -42,6 +42,19 @@
   <Banner tag="Penalty raté" sub="{cue.minute} · {team.name}" number={cue.player?.number ?? null} name={cue.player?.name ?? team.name} color={ALERT} {hurry} {ondone} />
 {:else if cue.type === 'card'}
   <CardMoment color={cue.color} player={cue.player} {team} minute={cue.minute} {hurry} {ondone} />
+{:else if cue.type === 'winner'}
+  {@const final = `${config.teams.home.name} ${cue.score.home} – ${cue.score.away} ${config.teams.away.name}`}
+  <Takeover
+    word="Victoire"
+    {team}
+    marquee={cue.shootout ? `${final} · ${cue.shootout.home} – ${cue.shootout.away} aux tirs au but` : final}
+    fontSize={300}
+    width={70}
+    x={320}
+    crestX={1640}
+    hold={3.6}
+    {ondone}
+  />
 {:else if cue.type === 'substitution'}
   <SubMoment playerIn={cue.in} playerOut={cue.out} {team} minute={cue.minute} {hurry} {ondone} />
 {/if}

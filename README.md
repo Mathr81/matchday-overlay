@@ -2,7 +2,7 @@
 
 Habillage de score animé pour les lives du BDT, piloté depuis un téléphone et affiché dans vMix ou OBS.
 
-État actuel : **étape 4 sur 9**. Le score, le chrono, les moments de match du thème Tigre, les panneaux (avant-match, compositions, résumé, stats, écran d'attente), les bandeaux libres, la page de contrôle et la simulation fonctionnent ; le reste est décrit dans `docs/superpowers/specs/2026-10-08-matchday-overlay-design.md`.
+État actuel : **étape 5 sur 9**. Tout un match de foot se gère en thème Tigre, du compte à rebours à la séance de tirs au but : score, chrono, moments, panneaux, bandeaux, prolongations, tirs au but, page de contrôle et simulation. Le reste (admin, autres thèmes, format vertical, vMix) est décrit dans `docs/superpowers/specs/2026-10-08-matchday-overlay-design.md`.
 
 ## Lancer
 
@@ -56,9 +56,28 @@ Dans le contrôle, sous « Antenne » :
 
 Ce qui est affiché survit à un rechargement de l'overlay et à un redémarrage du serveur.
 
+## Prolongations et tirs au but
+
+Le format du match est dans `data/config.json`, section `format` :
+
+```json
+"format": {
+  "periodMinutes": 45,
+  "periods": 2,
+  "extraTime": { "enabled": true, "periodMinutes": 15 },
+  "shootout": { "enabled": true, "kicks": 5 }
+}
+```
+
+- À la fin du temps réglementaire sur une égalité, le contrôle propose ce que le format permet : lancer la prolongation, passer aux tirs au but (en choisissant qui tire en premier), ou terminer sur ce score. Avec les deux options désactivées, le match se termine tout seul.
+- Pendant la séance, deux gros boutons « Marqué » et « Raté » pour l'équipe dont c'est le tour. Le panneau s'affiche tout seul, avec une case par tir.
+- L'app sait quand c'est fini : une équipe qui ne peut plus être rattrapée, ou la mort subite après une série à égalité (une case de plus s'ouvre à chaque tour).
+- « Annuler le dernier tir » corrige une erreur, même après la fin de la séance.
+- Le vainqueur n'est jamais annoncé tout seul : le bouton « Annoncer le vainqueur à l'antenne » lance le plein écran. Il existe aussi pour un match gagné dans le temps de jeu.
+
 ## Simulation
 
-La page de simulation rejoue un match complet (buts, penalty, but refusé, cartons, deuxième jaune, remplacement, temps additionnel) pour juger les animations sans être sur le terrain. Elle montre un aperçu de l'overlay, et l'entrée vMix ou OBS affiche la même chose au même moment.
+La page de simulation rejoue un match complet (avant-match, compositions, buts, penalty, but refusé, cartons, deuxième jaune, remplacement, stats, résumés, prolongations, tirs au but avec mort subite, annonce du vainqueur) pour juger les animations sans être sur le terrain. Elle montre un aperçu de l'overlay, et l'entrée vMix ou OBS affiche la même chose au même moment.
 
 Le vrai match est mis de côté pendant la simulation et revient intact avec « Quitter ». Seule exception : le panneau et le bandeau à l'antenne sont retirés au lancement et à la sortie de la simulation. Un redémarrage du serveur revient aussi au vrai match.
 

@@ -142,3 +142,17 @@ Retour du 9 octobre sur l'étape 3 : tout fonctionne.
 - Vérifié : 28 tests ; chaque panneau contrôlé par capture ; simulation complète sans erreur. Corrigé en route : nom d'équipe qui débordait sur l'avant-match, ligne de score trop large sur le résumé.
 - Pas encore vérifié dans vMix. Les captures montrent l'état final de chaque panneau, pas la fluidité des entrées et sorties.
 - Limite connue : le panneau et le bandeau sont communs au vrai match et à la simulation.
+
+9 octobre : étape 4 acceptée sans test (pas d'ordinateur sous la main), à revoir dans vMix.
+
+### Étape 5 — prolongations et tirs au but (faite le 9 octobre)
+
+- Format du match étendu : prolongations (deux périodes, durée propre) et séance de tirs au but (nombre de tirs réglable), chacune activable. Les deux sont actives par défaut.
+- À la fin d'une période, l'état calcule ce qui reste possible ; le contrôle ne propose que ça. Un nul peut toujours être terminé à la main.
+- Séance de tirs au but dans `src/shared/shootout.ts` : fin dès qu'une équipe ne peut plus être rattrapée, mort subite après une série à égalité, ordre des tireurs. Chaque tir est une ligne du journal, donc annulable ; annuler le tir décisif rouvre la séance.
+- Thème Tigre : panneau de la séance (cases tamponnées, case du prochain tireur qui clignote, bascule sur « Mort subite », ligne perdante estompée), score de la séance à côté du score du match, plein écran « Victoire ».
+- Le vainqueur est annoncé sur commande, jamais automatiquement.
+- Simulation prolongée jusqu'au bout : prolongations, 4 – 4 après cinq tirs, mort subite, victoire, résumé.
+- Vérifié : 36 tests, dont huit sur les prolongations et la séance ; séance et annonce contrôlées par capture ; simulation complète sans erreur.
+- Pas encore vérifié dans vMix, comme l'étape 4.
+- Pas fait : le nom du tireur. Le serveur l'accepte, mais le contrôle ne le demande pas et le panneau ne l'affiche pas.

@@ -33,7 +33,7 @@ export function defaultConfig(): Config {
         ]),
       },
     },
-    format: { periodMinutes: 45, periods: 2 },
+    format: { periodMinutes: 45, periods: 2, extraTime: { enabled: true, periodMinutes: 15 }, shootout: { enabled: true, kicks: 5 } },
     theme: 'tigre',
     texts: { title: 'Profs – Élèves', subtitle: 'Le match du BDT', holding: 'De retour dans un instant' },
     banners: [

@@ -20,6 +20,10 @@ export interface TeamConfig {
 export interface MatchFormat {
   periodMinutes: number;
   periods: number;
+  /** Deux périodes de plus en cas d'égalité à la fin du temps réglementaire. */
+  extraTime: { enabled: boolean; periodMinutes: number };
+  /** Séance de tirs au but en cas d'égalité ; `kicks` tirs par équipe avant la mort subite. */
+  shootout: { enabled: boolean; kicks: number };
 }
 
 /** Bandeau libre : commentateurs, message du BDT, sponsor… `qr` est un lien affiché en QR code. */
@@ -69,6 +73,9 @@ export type MatchEvent = Stamped &
     | { type: 'penalty_missed'; team: TeamId; player?: string }
     | { type: 'stat'; team: TeamId; key: StatKey; delta: 1 | -1 }
     | { type: 'added_time'; minutes: number }
+    | { type: 'match_ended' }
+    | { type: 'shootout_started'; first: TeamId }
+    | { type: 'shootout_kick'; team: TeamId; scored: boolean; player?: string }
   );
 
 export const STAT_KEYS = ['shots', 'onTarget', 'corners', 'fouls', 'offsides'] as const;
@@ -98,7 +105,27 @@ export type JournalRecord = MatchEvent | VoidRecord | EditRecord;
 
 // ---- état dérivé ----
 
-export type ClockPhase = 'pre' | 'running' | 'paused' | 'break' | 'ended';
+export type ClockPhase = 'pre' | 'running' | 'paused' | 'break' | 'shootout' | 'ended';
+
+export interface ShootoutKick {
+  id: string;
+  team: TeamId;
+  scored: boolean;
+  player?: string;
+}
+
+export interface ShootoutState {
+  first: TeamId;
+  kicks: ShootoutKick[];
+  taken: Record<TeamId, number>;
+  score: Record<TeamId, number>;
+  winner: TeamId | null;
+  suddenDeath: boolean;
+  /** Équipe qui doit tirer, null quand c'est fini. */
+  next: TeamId | null;
+  /** Nombre de cases à afficher par équipe. */
+  rounds: number;
+}
 
 export interface ClockState {
   /** 0 avant le coup d'envoi. */
@@ -113,7 +140,7 @@ export interface ClockState {
   addedMinutes: number | null;
 }
 
-export type TimelineItem = Exclude<Extract<MatchEvent, { team: TeamId }>, { type: 'stat' }> & { minute: string };
+export type TimelineItem = Exclude<Extract<MatchEvent, { team: TeamId }>, { type: 'stat' | 'shootout_kick' }> & { minute: string };
 
 export interface MatchState {
   score: Record<TeamId, number>;
@@ -125,6 +152,7 @@ export interface MatchState {
   cards: Record<string, { yellow: number; red: boolean }>;
   /** Compteurs saisis à la main. */
   stats: Record<TeamId, Record<StatKey, number>>;
+  shootout: ShootoutState | null;
 }
 
 /** Panneau affiché tant qu'on ne le retire pas. Tous couvrent l'écran sauf les stats. */
@@ -133,6 +161,7 @@ export type Panel =
   | { type: 'lineup'; team: TeamId }
   | { type: 'summary'; motm?: { team: TeamId; player: string } }
   | { type: 'stats' }
+  | { type: 'shootout' }
   | { type: 'holding' };
 
 export interface DisplayState {
@@ -161,6 +190,10 @@ export type CommandBody =
   | { type: 'void_event'; target: string }
   | { type: 'simulation'; on: boolean }
   | { type: 'stat'; team: TeamId; key: StatKey; delta: 1 | -1 }
+  | { type: 'end_match' }
+  | { type: 'start_shootout'; first: TeamId }
+  | { type: 'shootout_kick'; team: TeamId; scored: boolean; player?: string }
+  | { type: 'announce_winner' }
   | { type: 'set_panel'; panel: Panel | null }
   | { type: 'set_banner'; banner: Banner | null }
   | { type: 'set_score_visible'; visible: boolean }
@@ -192,6 +225,7 @@ export type Cue = { id: string; team: TeamId; minute: string } & (
   | { type: 'penalty_missed'; player: PlayerRef | null }
   | { type: 'card'; color: 'yellow' | 'red' | 'second_yellow'; player: PlayerRef | null }
   | { type: 'substitution'; in: PlayerRef | null; out: PlayerRef | null }
+  | { type: 'winner'; score: Record<TeamId, number>; shootout: Record<TeamId, number> | null }
 );
 
 export interface CueMessage {

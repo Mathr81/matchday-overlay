@@ -3,6 +3,7 @@
   import { connect, savedToken, type Connection } from '../client/connection';
   import PinForm from '../client/PinForm.svelte';
   import { formatClock, isSentOff, periodLabel } from '../shared/clock';
+  import { nextSteps } from '../shared/format';
   import { lineup, playerName } from '../shared/lineup';
   import { statLabel } from '../shared/summary';
   import { STAT_KEYS } from '../shared/types';
@@ -43,6 +44,8 @@
   const phase = $derived(snapshot?.match.clock.phase ?? 'pre');
   const playing = $derived(phase === 'running' || phase === 'paused');
   const added = $derived(snapshot?.match.clock.addedMinutes ?? 0);
+  const steps = $derived(snapshot ? nextSteps(snapshot.match, snapshot.config.format) : { period: false, shootout: false, end: false });
+  const shootout = $derived(snapshot?.match.shootout ?? null);
   const history = $derived(snapshot ? [...snapshot.match.timeline].reverse() : []);
   const teams: TeamId[] = ['home', 'away'];
   const other = (team: TeamId): TeamId => (team === 'home' ? 'away' : 'home');
@@ -100,9 +103,12 @@
     if (confirm('Démarrer un nouveau match ? Le match en cours sera archivé.')) send({ type: 'reset_match' });
   }
 
-  function endPeriod(config: Config) {
-    const last = (snapshot?.match.clock.period ?? 0) >= config.format.periods;
-    if (!last || confirm('Terminer le match ?')) send({ type: 'end_period' });
+  function endMatch() {
+    if (confirm('Terminer le match sur ce score ?')) send({ type: 'end_match' });
+  }
+
+  function kick(team: TeamId, scored: boolean) {
+    send({ type: 'shootout_kick', team, scored }, `Tir ${scored ? 'marqué' : 'raté'}`);
   }
 
   function togglePreview() {
@@ -280,9 +286,29 @@
     <section class="block">
       <h2>Chrono</h2>
       {#if phase === 'pre' || phase === 'break'}
-        <button class="primary" onclick={() => send({ type: 'start_period' })}>
-          {phase === 'pre' ? "Coup d'envoi" : 'Lancer la période suivante'}
-        </button>
+        {#if steps.period}
+          <button class="primary" onclick={() => send({ type: 'start_period' })}>
+            {phase === 'pre' ? "Coup d'envoi" : match.clock.period >= config.format.periods ? 'Lancer la prolongation' : 'Lancer la période suivante'}
+          </button>
+        {/if}
+        {#if steps.shootout}
+          <p class="done">Égalité. Tirs au but : qui tire en premier ?</p>
+          <div class="pair">
+            {#each teams as team (team)}
+              <button class:primary={!steps.period} onclick={() => send({ type: 'start_shootout', first: team })}>{config.teams[team].name}</button>
+            {/each}
+          </div>
+        {/if}
+        {#if steps.end}<button class="ghost" onclick={endMatch}>Terminer sur ce score</button>{/if}
+      {:else if phase === 'shootout' && shootout?.next}
+        {@const team = shootout.next}
+        <p class="done">
+          Tirs au but {shootout.score.home} – {shootout.score.away}{shootout.suddenDeath ? ' · mort subite' : ''} · au tour de <b>{config.teams[team].name}</b>
+        </p>
+        <div class="pair kicks">
+          <button class="scored" onclick={() => kick(team, true)}>Marqué</button>
+          <button class="red" onclick={() => kick(team, false)}>Raté</button>
+        </div>
       {:else if playing}
         <div class="pair">
           {#if phase === 'running'}
@@ -290,7 +316,7 @@
           {:else}
             <button class="primary" onclick={() => send({ type: 'resume_clock' })}>Reprendre</button>
           {/if}
-          <button onclick={() => endPeriod(config)}>Fin de période</button>
+          <button onclick={() => send({ type: 'end_period' })}>Fin de période</button>
         </div>
         <div class="stepper">
           <span>Temps additionnel</span>
@@ -299,7 +325,15 @@
           <button onclick={() => send({ type: 'set_added_time', minutes: added + 1 })}>+</button>
         </div>
       {:else}
-        <p class="done">Match terminé.</p>
+        <p class="done">
+          Match terminé{shootout ? ` · tirs au but ${shootout.score.home} – ${shootout.score.away}` : ''}.
+        </p>
+        {#if shootout?.winner || match.score.home !== match.score.away}
+          <button class="primary" onclick={() => send({ type: 'announce_winner' })}>Annoncer le vainqueur à l'antenne</button>
+        {/if}
+      {/if}
+      {#if shootout?.kicks.length}
+        <button class="ghost" onclick={() => send({ type: 'void_event', target: shootout.kicks[shootout.kicks.length - 1].id })}>Annuler le dernier tir</button>
       {/if}
     </section>
 
@@ -325,6 +359,9 @@
         <button class:primary={display.panel?.type === 'summary'} onclick={() => togglePanel({ type: 'summary' })}>Résumé</button>
         <button class:primary={display.panel?.type === 'stats'} onclick={() => togglePanel({ type: 'stats' })}>Stats</button>
         <button class:primary={display.panel?.type === 'holding'} onclick={() => togglePanel({ type: 'holding' })}>Attente</button>
+        {#if shootout}
+          <button class:primary={display.panel?.type === 'shootout'} onclick={() => togglePanel({ type: 'shootout' })}>Tirs au but</button>
+        {/if}
       </div>
       {#if display.panel?.type === 'summary'}
         <div class="pair">
@@ -796,6 +833,19 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .kicks button {
+    min-height: 96px;
+    font-size: 22px;
+    font-weight: 900;
+  }
+  .scored {
+    background: #23d17a;
+    border-color: #23d17a;
+    color: #0a0a0a;
+  }
+  .done b {
+    color: #f3eee4;
   }
   .grid3 {
     display: grid;

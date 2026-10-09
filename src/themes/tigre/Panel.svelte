@@ -3,6 +3,7 @@
   import HoldingPanel from './HoldingPanel.svelte';
   import LineupPanel from './LineupPanel.svelte';
   import PrematchPanel from './PrematchPanel.svelte';
+  import ShootoutPanel from './ShootoutPanel.svelte';
   import StatsPanel from './StatsPanel.svelte';
   import SummaryPanel from './SummaryPanel.svelte';
 
@@ -19,6 +20,8 @@
   <SummaryPanel {config} {match} motm={panel.motm} {leaving} {ongone} />
 {:else if panel.type === 'stats'}
   <StatsPanel {config} {match} {leaving} {ongone} />
+{:else if panel.type === 'shootout'}
+  <ShootoutPanel {config} shootout={match.shootout} {leaving} {ongone} />
 {:else if panel.type === 'holding'}
   <HoldingPanel {config} {leaving} {ongone} />
 {/if}

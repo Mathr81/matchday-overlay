@@ -52,6 +52,9 @@
     <div class="top">
       <div class="title para"><span>{title}</span></div>
       <div class="event para"><span>{config.texts.title}</span></div>
+      {#if match.shootout}
+        <div class="title para"><span>Tirs au but {match.shootout.score.home} – {match.shootout.score.away}</span></div>
+      {/if}
     </div>
 
     <div class="scoreline">

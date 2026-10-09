@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { nextSteps } from '../shared/format';
 import { reduce } from '../shared/reducer';
 import { STAT_KEYS } from '../shared/types';
 import type {
@@ -25,7 +26,7 @@ type RecordBody = Body<MatchEvent> | Body<VoidRecord> | Body<EditRecord>;
 type CueBody = Cue extends infer C ? (C extends unknown ? Omit<C, 'id' | 'minute'> : never) : never;
 
 const defaultDisplay = (): DisplayState => ({ scoreVisible: true, panel: null, banner: null });
-const PANEL_TYPES = ['prematch', 'lineup', 'summary', 'stats', 'holding'];
+const PANEL_TYPES = ['prematch', 'lineup', 'summary', 'stats', 'shootout', 'holding'];
 const text = (value: unknown, max: number) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 const other = (team: TeamId): TeamId => (team === 'home' ? 'away' : 'home');
 const isTeam = (team: unknown): team is TeamId => team === 'home' || team === 'away';
@@ -106,8 +107,30 @@ export class MatchStore {
 
     switch (cmd.type) {
       case 'start_period':
-        if (phase !== 'pre' && phase !== 'break') return refuse(phase === 'ended' ? 'Le match est terminé.' : 'Une période est déjà en cours.');
+        if (phase === 'running' || phase === 'paused') return refuse('Une période est déjà en cours.');
+        if (!nextSteps(before, this.config.format).period) return refuse(phase === 'ended' ? 'Le match est terminé.' : 'Pas de période suivante prévue.');
         return record({ type: 'period_started', period: period + 1 });
+      case 'end_match':
+        if (phase !== 'break') return refuse('Le match ne peut pas être terminé maintenant.');
+        return record({ type: 'match_ended' });
+      case 'start_shootout':
+        if (!isTeam(cmd.first)) return refuse('Équipe inconnue.');
+        if (!nextSteps(before, this.config.format).shootout) return refuse('Pas de tirs au but possibles maintenant.');
+        // Le panneau de la séance s'affiche tout seul.
+        this.setDisplay({ ...this.display, panel: { type: 'shootout' } });
+        return record({ type: 'shootout_started', first: cmd.first });
+      case 'shootout_kick':
+        if (!isTeam(cmd.team)) return refuse('Équipe inconnue.');
+        if (phase !== 'shootout' || !before.shootout) return refuse('La séance de tirs au but est terminée ou pas commencée.');
+        return record({ type: 'shootout_kick', team: cmd.team, scored: cmd.scored === true, player: cmd.player });
+      case 'announce_winner': {
+        const pens = before.shootout?.winner ? before.shootout.score : null;
+        const winner = before.shootout?.winner ?? (before.score.home > before.score.away ? 'home' : before.score.away > before.score.home ? 'away' : null);
+        if (phase !== 'ended' || !winner) return refuse("Il n'y a pas encore de vainqueur.");
+        // Le panneau de la séance laisse la place à l'annonce.
+        if (this.display.panel?.type === 'shootout') this.setDisplay({ ...this.display, panel: null });
+        return this.changed(cmd.cid, ok, { type: 'winner', id: cmd.cid, team: winner, minute: '', score: before.score, shootout: pens });
+      }
       case 'pause_clock':
         if (phase !== 'running') return refuse('Le chrono ne tourne pas.');
         return record({ type: 'clock_paused' });

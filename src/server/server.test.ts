@@ -159,6 +159,61 @@ describe('MatchStore', () => {
     expect(again.banner).toEqual({ title: 'Aux commentaires' });
   });
 
+  it('goes from a drawn match to extra time, then a shootout, and names the winner', () => {
+    const store = new MatchStore(tmp(), defaultConfig());
+    const play = () => {
+      expect(store.execute(cmd({ type: 'start_period' })).ok).toBe(true);
+      expect(store.execute(cmd({ type: 'end_period' })).ok).toBe(true);
+    };
+    play();
+    play();
+    expect(store.match.clock.phase).toBe('break');
+    expect(store.execute(cmd({ type: 'announce_winner' })).ok).toBe(false);
+    play();
+    play();
+    // Après les prolongations sur un nul, il ne reste que les tirs au but (ou finir sur ce score).
+    expect(store.execute(cmd({ type: 'start_period' })).ok).toBe(false);
+    expect(store.execute(cmd({ type: 'start_shootout', first: 'home' })).ok).toBe(true);
+    expect(store.snapshot().display.panel).toEqual({ type: 'shootout' });
+
+    let cue: unknown;
+    store.subscribe((c) => (cue = c ?? cue));
+    for (const scored of [true, false, true, false, true, false]) {
+      const team = store.match.shootout!.next!;
+      store.execute(cmd({ type: 'shootout_kick', team, scored }, team + store.match.shootout!.kicks.length));
+    }
+    // 3 – 0 après trois tirs chacun : l'autre équipe ne peut plus revenir.
+    expect(store.match.shootout).toMatchObject({ winner: 'home', score: { home: 3, away: 0 } });
+    expect(store.match.clock.phase).toBe('ended');
+    expect(store.execute(cmd({ type: 'shootout_kick', team: 'away', scored: true })).ok).toBe(false);
+    store.execute(cmd({ type: 'announce_winner' }));
+    expect(cue).toMatchObject({ type: 'winner', team: 'home', shootout: { home: 3, away: 0 } });
+
+    // Annuler le dernier tir rouvre la séance.
+    store.execute(cmd({ type: 'void_event', target: 'away5' }));
+    expect(store.match.clock.phase).toBe('shootout');
+    expect(store.match.shootout?.winner).toBeNull();
+  });
+
+  it('ends a match with a winner at full time, and lets a draw be ended without a shootout', () => {
+    const store = new MatchStore(tmp(), defaultConfig());
+    store.execute(cmd({ type: 'start_period' }));
+    store.execute(cmd({ type: 'end_period' }));
+    store.execute(cmd({ type: 'start_period' }));
+    store.execute(cmd({ type: 'goal', team: 'away' }));
+    store.execute(cmd({ type: 'end_period' }));
+    expect(store.match.clock.phase).toBe('ended');
+    expect(store.execute(cmd({ type: 'announce_winner' })).ok).toBe(true);
+
+    const draw = new MatchStore(tmp(), defaultConfig());
+    draw.execute(cmd({ type: 'start_period' }));
+    draw.execute(cmd({ type: 'end_period' }));
+    draw.execute(cmd({ type: 'start_period' }));
+    draw.execute(cmd({ type: 'end_period' }));
+    expect(draw.execute(cmd({ type: 'end_match' })).ok).toBe(true);
+    expect(draw.match.clock.phase).toBe('ended');
+  });
+
   it('archives the journal on reset', () => {
     const dir = tmp();
     const store = new MatchStore(dir, defaultConfig());

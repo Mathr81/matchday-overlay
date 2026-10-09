@@ -22,8 +22,8 @@
   const banner = new Slot<Banner>();
 
   const match = $derived(snapshot && heldScore ? { ...snapshot.match, score: heldScore } : snapshot?.match);
-  // Un panneau plein écran prend la place du score ; les stats le laissent visible.
-  const covering = $derived(!!snapshot?.display.panel && snapshot.display.panel.type !== 'stats');
+  // Un panneau plein écran prend la place du score ; les stats et les tirs au but le laissent visible.
+  const covering = $derived(!!snapshot?.display.panel && snapshot.display.panel.type !== 'stats' && snapshot.display.panel.type !== 'shootout');
 
   $effect(() => {
     const want = snapshot?.display.panel ?? null;

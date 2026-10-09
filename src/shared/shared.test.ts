@@ -3,7 +3,7 @@ import { formatClock, periodLabel } from './clock';
 import { reduce } from './reducer';
 import type { JournalRecord, MatchFormat } from './types';
 
-const format: MatchFormat = { periodMinutes: 45, periods: 2 };
+const format: MatchFormat = { periodMinutes: 45, periods: 2, extraTime: { enabled: true, periodMinutes: 15 }, shootout: { enabled: true, kicks: 5 } };
 const T0 = 1_000_000;
 const MIN = 60_000;
 
@@ -60,6 +60,7 @@ describe('reduce', () => {
     records.push({ id: '3', at: T0 + 60 * MIN, type: 'period_started', period: 2 });
     const second = reduce(records, format);
     expect(formatClock(second.clock, format, T0 + 60 * MIN)).toBe('45:00');
+    records.push({ id: 'g', at: T0 + 100 * MIN, type: 'goal', team: 'home', kind: 'normal' });
     records.push({ id: '4', at: T0 + 106 * MIN, type: 'period_ended' });
     expect(reduce(records, format).clock.phase).toBe('ended');
   });
@@ -99,6 +100,72 @@ describe('periodLabel', () => {
     expect(at([])).toBe('Avant-match');
     expect(at([{ id: '1', at: T0, type: 'period_started', period: 1 }])).toBe('1re mi-temps');
     expect(at([{ id: '1', at: T0, type: 'period_started', period: 1 }, { id: '2', at: T0, type: 'period_ended' }])).toBe('Mi-temps');
+  });
+});
+
+describe('extra time', () => {
+  it('starts at 90:00, lasts 15 minutes and is named', () => {
+    const records: JournalRecord[] = [
+      { id: '1', at: T0, type: 'period_started', period: 1 },
+      { id: '2', at: T0, type: 'period_ended' },
+      { id: '3', at: T0, type: 'period_started', period: 2 },
+      { id: '4', at: T0, type: 'period_ended' },
+    ];
+    expect(periodLabel(reduce(records, format).clock, format)).toBe('Fin du temps réglementaire');
+    records.push({ id: '5', at: T0, type: 'period_started', period: 3 });
+    const clock = reduce(records, format).clock;
+    expect(periodLabel(clock, format)).toBe('Prolongation 1');
+    expect(formatClock(clock, format, T0 + 5 * MIN)).toBe('95:00');
+    expect(formatClock(clock, format, T0 + 16 * MIN)).toBe('105+1:00');
+  });
+
+  it('ends a drawn match straight away when neither extra time nor shootout is planned', () => {
+    const plain: MatchFormat = { ...format, extraTime: { enabled: false, periodMinutes: 15 }, shootout: { enabled: false, kicks: 5 } };
+    const records: JournalRecord[] = [
+      { id: '1', at: T0, type: 'period_started', period: 1 },
+      { id: '2', at: T0, type: 'period_ended' },
+      { id: '3', at: T0, type: 'period_started', period: 2 },
+      { id: '4', at: T0, type: 'period_ended' },
+    ];
+    expect(reduce(records, plain).clock.phase).toBe('ended');
+  });
+});
+
+describe('shootout', () => {
+  const run = async (first: 'home' | 'away', results: [0 | 1, 0 | 1][], series = 5) => {
+    const { shootoutState } = await import('./shootout');
+    const kicks = results.flatMap(([a, b], i) => [
+      { id: `a${i}`, team: first, scored: !!a },
+      { id: `b${i}`, team: first === 'home' ? ('away' as const) : ('home' as const), scored: !!b },
+    ]);
+    return (count = kicks.length) => shootoutState(first, kicks.slice(0, count), series);
+  };
+
+  it('alternates kickers starting with the chosen team', async () => {
+    const at = await run('away', [[1, 1]]);
+    expect(at(0).next).toBe('away');
+    expect(at(1).next).toBe('home');
+    expect(at(2).next).toBe('away');
+  });
+
+  it('stops as soon as one team cannot be caught', async () => {
+    const at = await run('home', [[1, 0], [1, 0], [1, 0]]);
+    expect(at(5).winner).toBeNull();
+    expect(at(6)).toMatchObject({ winner: 'home', next: null });
+  });
+
+  it('can be won by the first kicker of the last round', async () => {
+    // 4 – 3 avant le dernier tour, l'équipe qui mène marque : 5 – 3, un seul tir restant en face.
+    const at = await run('home', [[1, 1], [1, 1], [1, 0], [1, 1], [1, 1]]);
+    expect(at(8).winner).toBeNull();
+    expect(at(9).winner).toBe('home');
+  });
+
+  it('goes to sudden death on a level series and needs both kicks of a round', async () => {
+    const at = await run('home', [[1, 1], [1, 0], [0, 1], [1, 1], [1, 1], [1, 0]]);
+    expect(at(10)).toMatchObject({ winner: null, suddenDeath: true, rounds: 6, next: 'home' });
+    expect(at(11).winner).toBeNull();
+    expect(at(12)).toMatchObject({ winner: 'home', score: { home: 5, away: 4 }, suddenDeath: true });
   });
 });
 

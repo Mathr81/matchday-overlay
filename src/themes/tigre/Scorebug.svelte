@@ -11,6 +11,7 @@
   const OUT = 'expo.out';
   let root: HTMLDivElement;
   let addTag: HTMLDivElement;
+  let penTag: HTMLDivElement;
   let timeline: gsap.core.Timeline | null = null;
   let shown = false;
   let lastTotal: number | null = null;
@@ -73,6 +74,13 @@
     if (addTag) gsap.to(addTag, { '--p': open ? 1 : 0, duration: 0.45, ease: open ? OUT : 'power3.in', delay: open ? 0.3 : 0 });
   });
 
+  // Pendant et après la séance, le score des tirs au but s'affiche à côté de la période.
+  const pens = $derived(match.shootout?.score ?? null);
+  $effect(() => {
+    const open = visible && pens !== null;
+    if (penTag) gsap.to(penTag, { '--p': open ? 1 : 0, duration: 0.45, ease: open ? OUT : 'power3.in', delay: open ? 0.3 : 0 });
+  });
+
   // Changement de score : éclat orange sur le bloc et petit sursaut de l'ensemble.
   $effect(() => {
     const total = match.score.home + match.score.away;
@@ -105,6 +113,7 @@
   <div class="sub">
     <div class="tag para t-per"><span>{periodLabel(match.clock, config.format)}</span></div>
     <div class="tag para t-add" bind:this={addTag}><span>+{addedText}</span></div>
+    <div class="tag para t-add t-pen" bind:this={penTag}><span>{pens?.home ?? 0} – {pens?.away ?? 0}</span></div>
   </div>
 </div>
 
@@ -202,6 +211,10 @@
   }
   .t-per {
     background: rgba(10, 10, 10, 0.94);
+  }
+  /* Les deux étiquettes orange ne sont jamais ouvertes ensemble : fermée, une étiquette ne prend pas de place. */
+  .t-pen {
+    margin-left: -46px;
   }
   .t-add {
     --p: 0;

@@ -1,3 +1,4 @@
+import { maxPeriods, periodLength } from './format';
 import type { ClockState, MatchFormat } from './types';
 
 export function elapsedInPeriod(clock: ClockState, now: number): number {
@@ -12,7 +13,7 @@ function mmss(ms: number, padMinutes: boolean): string {
 
 /** « 67:24 » dans le temps réglementaire, « 45+2:13 » au-delà. */
 export function formatClock(clock: ClockState, format: MatchFormat, now: number): string {
-  const length = format.periodMinutes * 60_000;
+  const length = periodLength(format, clock.period);
   const within = elapsedInPeriod(clock, now);
   if (within < length) return mmss(clock.baseMs + within, true);
   return `${(clock.baseMs + length) / 60_000}+${mmss(within - length, false)}`;
@@ -21,14 +22,20 @@ export function formatClock(clock: ClockState, format: MatchFormat, now: number)
 export function periodLabel(clock: ClockState, format: MatchFormat): string {
   if (clock.phase === 'pre') return 'Avant-match';
   if (clock.phase === 'ended') return 'Terminé';
-  if (clock.phase === 'break') return format.periods === 2 ? 'Mi-temps' : 'Pause';
+  if (clock.phase === 'shootout') return 'Tirs au but';
+  if (clock.phase === 'break') {
+    if (clock.period === maxPeriods(format) && clock.period > format.periods) return 'Fin des prolongations';
+    if (clock.period === format.periods) return 'Fin du temps réglementaire';
+    return format.periods === 2 && clock.period === 1 ? 'Mi-temps' : 'Pause';
+  }
+  if (clock.period > format.periods) return `Prolongation ${clock.period - format.periods}`;
   if (format.periods === 2) return clock.period === 1 ? '1re mi-temps' : '2e mi-temps';
   return `Période ${clock.period}`;
 }
 
 /** Minute de jeu d'un événement : « 67' », ou « 45+2' » dans le temps additionnel. */
 export function minuteLabel(clock: ClockState, format: MatchFormat, at: number): string {
-  const length = format.periodMinutes * 60_000;
+  const length = periodLength(format, clock.period);
   const within = elapsedInPeriod(clock, at);
   if (within < length) return `${Math.floor((clock.baseMs + within) / 60_000) + 1}'`;
   return `${(clock.baseMs + length) / 60_000}+${Math.floor((within - length) / 60_000) + 1}'`;

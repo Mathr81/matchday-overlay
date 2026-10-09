@@ -16,6 +16,13 @@ const stat = (team: 'home' | 'away', key: 'shots' | 'onTarget' | 'corners' | 'fo
   command: { type: 'stat', team, key, delta: 1 },
   wait: 0,
 });
+/** Tours de tirs au but : [élèves, profs], 1 pour marqué. */
+const kicks = (chapter: string, ...rounds: [0 | 1, 0 | 1][]): Step[] =>
+  rounds.flatMap(([home, away]) => [
+    { chapter, command: { type: 'shootout_kick', team: 'home', scored: !!home }, wait: 2.2 } as Step,
+    { chapter, command: { type: 'shootout_kick', team: 'away', scored: !!away }, wait: 2.2 } as Step,
+  ]);
+
 /** Quelques compteurs d'un coup, sans attendre, rattachés au chapitre en cours. */
 const stats = (chapter: string, ...steps: Step[]): Step[] => steps.map((s) => ({ ...s, chapter }));
 
@@ -52,6 +59,15 @@ export const script: Step[] = [
   { chapter: 'Égalisation', clock: '87:45', command: { type: 'goal', team: 'away', scorer: 'a10', assist: 'a8' }, wait: 9 },
   { chapter: 'Fin du temps réglementaire', clock: '89:50', command: { type: 'set_added_time', minutes: 4 }, wait: 4 },
   { chapter: 'Fin du temps réglementaire', clock: '93:50', command: { type: 'end_period' }, wait: 2 },
+  { chapter: 'Prolongations', command: { type: 'start_period' }, wait: 4 },
+  { chapter: 'Prolongations', clock: '104:55', command: { type: 'end_period' }, wait: 3 },
+  { chapter: 'Prolongations', command: { type: 'start_period' }, wait: 3 },
+  { chapter: 'Prolongations', clock: '112:30', command: { type: 'card', team: 'home', color: 'yellow', player: 'h4' }, wait: 6 },
+  { chapter: 'Prolongations', clock: '119:55', command: { type: 'end_period' }, wait: 3 },
+  { chapter: 'Tirs au but', command: { type: 'start_shootout', first: 'home' }, wait: 3 },
+  ...kicks('Tirs au but', [1, 1], [1, 0], [0, 1], [1, 1], [1, 1]),
+  ...kicks('Mort subite', [1, 0]),
+  { chapter: 'Victoire', command: { type: 'announce_winner' }, wait: 6 },
   { chapter: 'Résumé', command: { type: 'set_panel', panel: { type: 'summary', motm: { team: 'home', player: 'h9' } } }, wait: 10 },
   { chapter: 'Résumé', command: { type: 'set_panel', panel: null }, wait: 1 },
 ];
