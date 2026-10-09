@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 import type { Command, CommandBody, ServerMessage, Snapshot } from '../shared/types';
 import { buildApp } from './app';
-import { defaultConfig, loadConfig, saveConfig, validateConfig } from './config';
+import { defaultConfig, defaultSettings, loadConfig, saveConfig, validateConfig, validateSettings } from './config';
+import { VmixBridge, vmixUrl } from './vmix';
 import { Journal } from './journal';
 import { MatchStore } from './store';
 
@@ -36,8 +37,11 @@ describe('config', () => {
   it('fills in fields missing from an older file and keeps what was there', () => {
     const dir = tmp();
     fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ pin: '2468', format: { periodMinutes: 30, periods: 2 }, teams: { home: { name: 'Terminales' } } }));
-    const { config, pin } = loadConfig(dir);
-    expect(pin).toBe('2468');
+    const { config, settings } = loadConfig(dir);
+    expect(settings.pin).toBe('2468');
+    expect(settings.vmix.enabled).toBe(false);
+    // La clé tirée au premier lancement est écrite : elle ne change pas au redémarrage suivant.
+    expect(loadConfig(dir).settings.apiKey).toBe(settings.apiKey);
     expect(config.teams.home).toMatchObject({ name: 'Terminales', code: 'ELV' });
     expect(config.format).toMatchObject({ periodMinutes: 30, shootout: { enabled: true, kicks: 5 } });
   });
@@ -46,8 +50,9 @@ describe('config', () => {
     const dir = tmp();
     const config = defaultConfig();
     config.texts.title = 'Finale';
-    saveConfig(dir, config, '1357');
-    expect(loadConfig(dir)).toEqual({ config, pin: '1357' });
+    const settings = { ...defaultSettings(), pin: '1357' };
+    saveConfig(dir, config, settings);
+    expect(loadConfig(dir)).toEqual({ config, settings });
   });
 
   it('accepts the default configuration and explains what is wrong otherwise', () => {
@@ -61,7 +66,65 @@ describe('config', () => {
   });
 });
 
+describe('vMix', () => {
+  const trigger = { id: 't', on: 'goal' as const, enabled: true, function: 'OverlayInput1In', input: 'Mon titre', delayMs: 0 };
+
+  it('builds the API address and drops empty parameters', () => {
+    expect(vmixUrl('http://127.0.0.1:8088/', { function: 'ReplayMarkInOut', value: '10' })).toBe('http://127.0.0.1:8088/api/?Function=ReplayMarkInOut&Value=10');
+  });
+
+  it('stays silent when the master switch is off or the trigger is disabled', async () => {
+    const calls: string[] = [];
+    const fetcher = (async (url: string) => (calls.push(url), new Response('ok'))) as unknown as typeof fetch;
+    const settings = { enabled: false, host: 'http://x', triggers: [trigger, { ...trigger, id: 'u', enabled: false, on: 'winner' as const }] };
+    const bridge = new VmixBridge(() => settings, fetcher);
+    bridge.fire(['goal']);
+    settings.enabled = true;
+    bridge.fire(['winner']);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls).toHaveLength(0);
+    bridge.fire(['goal', 'goal_home']);
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+  });
+
+  it('logs a failure instead of throwing when vMix is unreachable', async () => {
+    const fetcher = (async () => {
+      throw new TypeError('fetch failed');
+    }) as unknown as typeof fetch;
+    const bridge = new VmixBridge(() => ({ enabled: true, host: 'http://x', triggers: [trigger] }), fetcher);
+    const entry = await bridge.call(trigger);
+    expect(entry).toMatchObject({ ok: false, detail: 'vMix est injoignable à cette adresse.' });
+    expect(bridge.log).toHaveLength(1);
+  });
+
+  it('checks the settings sent by the admin', () => {
+    expect(validateSettings(defaultSettings())).toMatchObject({ vmix: { enabled: false } });
+    expect(validateSettings({ ...defaultSettings(), pin: '12' })).toContain('PIN');
+    const bad = defaultSettings();
+    bad.vmix.host = 'vmix';
+    expect(validateSettings(bad)).toContain('Adresse de vMix');
+    const badFn = defaultSettings();
+    badFn.vmix.triggers[0].function = 'Cut&Input=1';
+    expect(validateSettings(badFn)).toContain('nom de fonction');
+  });
+});
+
 describe('MatchStore', () => {
+  it('reports match events for automations, but never during a simulation or for a silent goal', () => {
+    const store = new MatchStore(tmp(), defaultConfig());
+    const seen: string[][] = [];
+    store.onTrigger((events) => seen.push(events));
+    store.execute(cmd({ type: 'start_period' }));
+    store.execute(cmd({ type: 'goal', team: 'home' }, 'g'));
+    store.execute(cmd({ type: 'goal', team: 'home' }, 'g'));
+    store.execute(cmd({ type: 'goal', team: 'away', silent: true }));
+    store.execute(cmd({ type: 'card', team: 'away', color: 'yellow', player: 'a4' }));
+    store.execute(cmd({ type: 'card', team: 'away', color: 'yellow', player: 'a4' }));
+    store.execute(cmd({ type: 'simulation', on: true }));
+    store.execute(cmd({ type: 'goal', team: 'home' }));
+    expect(seen).toEqual([['period_start'], ['goal', 'goal_home'], ['card_yellow'], ['card_red']]);
+  });
+
   it('applies a command only once when it is received twice', () => {
     const store = new MatchStore(tmp(), defaultConfig());
     const goal = cmd({ type: 'goal', team: 'home' });
@@ -259,8 +322,23 @@ describe('WebSocket', () => {
 
   async function start() {
     const store = new MatchStore(tmp(), defaultConfig());
-    const saved: { pin?: string } = {};
-    const app = await buildApp({ store, webDir: tmp(), logosDir: tmp(), uploadsDir: tmp(), pin: '4321', onSave: (_c, pin) => (saved.pin = pin) });
+    const saved: { pin?: string; theme?: string } = {};
+    const calls: string[] = [];
+    const fetcher = (async (url: string) => {
+      calls.push(url);
+      return new Response('<vmix><version>28.0.0.39</version></vmix>');
+    }) as unknown as typeof fetch;
+    const settings = { ...defaultSettings(), pin: '4321', apiKey: 'companion-key' };
+    settings.vmix = { enabled: true, host: 'http://vmix.test:8088', triggers: [{ id: 't1', on: 'goal_home', enabled: true, function: 'OverlayInput2In', input: 'Jingle but', delayMs: 0 }] };
+    const app = await buildApp({
+      store,
+      webDir: tmp(),
+      logosDir: tmp(),
+      uploadsDir: tmp(),
+      settings,
+      fetcher,
+      onSave: (c, s) => ((saved.pin = s.pin), (saved.theme = c.theme)),
+    });
     const login = await app.inject({ method: 'POST', url: '/api/login', payload: { pin: '4321' } });
     const token = login.json().token as string;
     await app.listen({ port: 0, host: '127.0.0.1' });
@@ -280,7 +358,7 @@ describe('WebSocket', () => {
       const send = (body: CommandBody) => ws.send(JSON.stringify({ type: 'command', command: cmd(body) }));
       return { next, send };
     };
-    return { open, store, app, port, token, saved };
+    return { open, store, app, port, token, saved, settings, calls };
   }
 
   it('gives a token only for the right PIN, and closes a control socket without it', async () => {
@@ -307,30 +385,30 @@ describe('WebSocket', () => {
   });
 
   it('saves a new configuration from the admin, pushes it to every screen, and rejects a bad one', async () => {
-    const { open, store, app, token } = await start();
+    const { open, store, app, token, settings } = await start();
     const overlay = open('overlay');
     await overlay.next();
     const config = defaultConfig();
     config.teams.home.name = 'Terminales';
     config.format.periodMinutes = 30;
 
-    expect((await app.inject({ method: 'POST', url: '/api/config', payload: { config, pin: '4321' } })).statusCode).toBe(401);
-    const ok = await app.inject({ method: 'POST', url: '/api/config', headers: { 'x-token': token }, payload: { config, pin: '4321' } });
+    expect((await app.inject({ method: 'POST', url: '/api/config', payload: { config, settings } })).statusCode).toBe(401);
+    const ok = await app.inject({ method: 'POST', url: '/api/config', headers: { 'x-token': token }, payload: { config, settings } });
     expect(ok.statusCode).toBe(200);
     expect(((await overlay.next()) as Snapshot).config.teams.home.name).toBe('Terminales');
     expect(store.config.format.periodMinutes).toBe(30);
 
     config.teams.home.color = 'orange';
-    const bad = await app.inject({ method: 'POST', url: '/api/config', headers: { 'x-token': token }, payload: { config, pin: '4321' } });
+    const bad = await app.inject({ method: 'POST', url: '/api/config', headers: { 'x-token': token }, payload: { config, settings } });
     expect(bad.statusCode).toBe(400);
     expect(bad.json().error).toContain('couleur');
   });
 
   it('changing the PIN disconnects phones and makes the old token useless', async () => {
-    const { open, app, token, saved, port } = await start();
+    const { open, app, token, saved, port, settings } = await start();
     const control = open('control');
     await control.next();
-    const res = await app.inject({ method: 'POST', url: '/api/config', headers: { 'x-token': token }, payload: { config: defaultConfig(), pin: '9999' } });
+    const res = await app.inject({ method: 'POST', url: '/api/config', headers: { 'x-token': token }, payload: { config: defaultConfig(), settings: { ...settings, pin: '9999' } } });
     expect(saved.pin).toBe('9999');
     expect(res.json().token).not.toBe(token);
     const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?role=control&token=${token}`);
@@ -345,6 +423,45 @@ describe('WebSocket', () => {
     expect((await app.inject({ method: 'GET', url: ok.json().path })).statusCode).toBe(200);
     const bad = await app.inject({ method: 'POST', url: '/api/logo', headers: { 'x-token': token }, payload: { data: 'data:text/html;base64,PGI+' } });
     expect(bad.statusCode).toBe(400);
+  });
+
+  it('calls vMix when a matching event happens, and only then', async () => {
+    const { open, calls } = await start();
+    const control = open('control');
+    await control.next();
+    control.send({ type: 'goal', team: 'away' });
+    control.send({ type: 'goal', team: 'home', silent: true });
+    control.send({ type: 'goal', team: 'home' });
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toBe('http://vmix.test:8088/api/?Function=OverlayInput2In&Input=Jingle%20but');
+  });
+
+  it('lets Companion drive the display with the key, and nothing without it', async () => {
+    const { app, store } = await start();
+    expect((await app.inject('/api/do/score/hide?key=wrong')).statusCode).toBe(401);
+    expect(store.snapshot().display.scoreVisible).toBe(true);
+    await app.inject('/api/do/score/hide?key=companion-key');
+    expect(store.snapshot().display.scoreVisible).toBe(false);
+    await app.inject('/api/do/panel/lineup-away?key=companion-key');
+    expect(store.snapshot().display.panel).toEqual({ type: 'lineup', team: 'away' });
+    await app.inject('/api/do/banner/1?key=companion-key');
+    expect(store.snapshot().display.banner?.title).toBe('Aux commentaires');
+    await app.inject('/api/do/banner/1?key=companion-key');
+    expect(store.snapshot().display.banner).toBeNull();
+    expect((await app.inject('/api/do/banner/99?key=companion-key')).statusCode).toBe(404);
+    // Les actions de match ne passent pas par ces adresses.
+    expect((await app.inject('/api/do/goal/home?key=companion-key')).statusCode).toBe(404);
+  });
+
+  it('reports whether vMix answers and tests a single call from the admin', async () => {
+    const { app, token, calls } = await start();
+    const status = await app.inject({ url: '/api/vmix/status', headers: { 'x-token': token } });
+    expect(status.json()).toEqual({ ok: true, detail: 'vMix 28.0.0.39' });
+    const test = await app.inject({ method: 'POST', url: '/api/vmix/test', headers: { 'x-token': token }, payload: { function: 'Fade', duration: '500' } });
+    expect(test.json()).toMatchObject({ ok: true, url: 'http://vmix.test:8088/api/?Function=Fade&Duration=500' });
+    expect(calls).toHaveLength(2);
+    const log = await app.inject({ url: '/api/vmix/log', headers: { 'x-token': token } });
+    expect(log.json().log).toHaveLength(1);
   });
 
   it('refuses commands coming from an overlay', async () => {

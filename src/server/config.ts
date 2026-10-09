@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { THEMES } from '../shared/types';
-import type { Banner, Config, Player, TeamConfig, TeamId } from '../shared/types';
+import { THEMES, TRIGGER_EVENTS } from '../shared/types';
+import type { Banner, Config, Player, PrivateSettings, TeamConfig, TeamId, VmixTrigger } from '../shared/types';
 
 // Effectifs d'exemple : à remplacer par les vrais noms dans la page d'admin.
 const roster = (prefix: string, names: string[]): Player[] =>
@@ -45,27 +45,46 @@ export function defaultConfig(): Config {
   };
 }
 
-/** Ce qui est écrit dans data/config.json : la configuration publique, plus le code PIN qui ne quitte jamais le serveur. */
-export type SavedConfig = Config & { pin: string };
+/** Ce qui est écrit dans data/config.json : la configuration publique, plus les réglages qui ne quittent jamais le serveur. */
+export type SavedConfig = Config & PrivateSettings;
 
 const newPin = () => String(crypto.randomInt(0, 10_000)).padStart(4, '0');
 const configFile = (dataDir: string) => path.join(dataDir, 'config.json');
 
-export function saveConfig(dataDir: string, config: Config, pin: string): void {
+/** Réglages de départ. Les déclencheurs vMix fournis sont des exemples, tous désactivés, et aucun ne change de plan à l'antenne. */
+export function defaultSettings(): PrivateSettings {
+  return {
+    pin: newPin(),
+    apiKey: crypto.randomBytes(12).toString('hex'),
+    vmix: {
+      enabled: false,
+      host: 'http://127.0.0.1:8088',
+      triggers: [
+        { id: 'exemple-jingle', on: 'goal', enabled: false, function: 'OverlayInput2In', input: 'Jingle but', delayMs: 0 },
+        { id: 'exemple-replay', on: 'goal', enabled: false, function: 'ReplayMarkInOut', value: '10', delayMs: 0 },
+        { id: 'exemple-fin', on: 'winner', enabled: false, function: 'OverlayInput2In', input: 'Générique de fin', delayMs: 0 },
+      ],
+    },
+  };
+}
+
+export function saveConfig(dataDir: string, config: Config, settings: PrivateSettings): void {
   fs.mkdirSync(dataDir, { recursive: true });
   const tmp = configFile(dataDir) + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify({ pin, ...config }, null, 2));
+  fs.writeFileSync(tmp, JSON.stringify({ ...settings, ...config }, null, 2));
   fs.renameSync(tmp, configFile(dataDir));
 }
 
 /** Lit data/config.json et le complète (ou le crée) quand il manque des champs. */
-export function loadConfig(dataDir: string): { config: Config; pin: string } {
+export function loadConfig(dataDir: string): { config: Config; settings: PrivateSettings } {
   const file = configFile(dataDir);
   const defaults = defaultConfig();
   // Un fichier écrit par une version plus ancienne peut ne pas avoir tous les champs.
   const saved: Partial<SavedConfig> = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
   const team = (id: TeamId) => ({ ...defaults.teams[id], ...saved.teams?.[id] });
-  const { pin = newPin(), ...rest } = saved;
+  const fresh = defaultSettings();
+  const { pin = fresh.pin, apiKey = fresh.apiKey, vmix, ...rest } = saved;
+  const settings: PrivateSettings = { pin, apiKey, vmix: { ...fresh.vmix, ...vmix } };
   const config: Config = {
     ...defaults,
     ...rest,
@@ -78,8 +97,8 @@ export function loadConfig(dataDir: string): { config: Config; pin: string } {
     },
     texts: { ...defaults.texts, ...saved.texts },
   };
-  if (saved.pin === undefined) saveConfig(dataDir, config, pin);
-  return { config, pin };
+  if (saved.pin === undefined || saved.apiKey === undefined || saved.vmix === undefined) saveConfig(dataDir, config, settings);
+  return { config, settings };
 }
 
 // ---- validation de ce que la page d'admin envoie ----
@@ -155,4 +174,38 @@ export function validateConfig(input: Partial<Config> | undefined): Config | str
   }
 }
 
-export const validPin = (pin: unknown): pin is string => typeof pin === 'string' && /^\d{4,8}$/.test(pin);
+/** Vérifie les réglages privés reçus de la page d'admin. Renvoie les réglages propres, ou un message d'erreur. */
+export function validateSettings(input: Partial<PrivateSettings> | undefined): PrivateSettings | string {
+  try {
+    if (typeof input?.pin !== 'string' || !/^\d{4,8}$/.test(input.pin)) throw new Invalid('Le code PIN doit faire 4 à 8 chiffres.');
+    const apiKey = str(input.apiKey, 'Clé Companion', 64);
+    if (!/^[\w-]{8,64}$/.test(apiKey)) throw new Invalid('Clé Companion : 8 à 64 lettres, chiffres ou tirets.');
+    const host = str(input.vmix?.host, 'Adresse de vMix', 100);
+    if (!/^https?:\/\/[\w.-]+(:\d+)?\/?$/.test(host)) throw new Invalid('Adresse de vMix : elle doit ressembler à http://127.0.0.1:8088.');
+    const triggers = Array.isArray(input.vmix?.triggers) ? input.vmix.triggers : [];
+    if (triggers.length > 40) throw new Invalid('40 déclencheurs au plus.');
+    return {
+      pin: input.pin,
+      apiKey,
+      vmix: {
+        enabled: input.vmix?.enabled === true,
+        host,
+        triggers: triggers.map((t: Partial<VmixTrigger>, i) => {
+          const label = `Déclencheur ${i + 1}`;
+          if (!t?.on || !(t.on in TRIGGER_EVENTS)) throw new Invalid(`${label} : événement inconnu.`);
+          const fn = str(t.function, `${label}, fonction`, 60);
+          if (!/^\w+$/.test(fn)) throw new Invalid(`${label} : le nom de fonction ne contient que des lettres et des chiffres.`);
+          const trigger: VmixTrigger = { id: str(t.id, label, 40), on: t.on, enabled: t.enabled === true, function: fn, delayMs: int(t.delayMs, `${label}, délai`, 0, 60_000) };
+          for (const key of ['input', 'value', 'duration'] as const) {
+            const v = str(t[key], `${label}, ${key}`, 120, false);
+            if (v) trigger[key] = v;
+          }
+          return trigger;
+        }),
+      },
+    };
+  } catch (e) {
+    if (e instanceof Invalid) return e.message;
+    throw e;
+  }
+}

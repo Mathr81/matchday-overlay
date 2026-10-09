@@ -17,6 +17,7 @@ import type {
   PlayerRef,
   Snapshot,
   TeamId,
+  TriggerEvent,
   VoidRecord,
 } from '../shared/types';
 import { Journal } from './journal';
@@ -32,6 +33,24 @@ const other = (team: TeamId): TeamId => (team === 'home' ? 'away' : 'home');
 const isTeam = (team: unknown): team is TeamId => team === 'home' || team === 'away';
 const PATCH_KEYS: (keyof EventPatch)[] = ['team', 'kind', 'color', 'scorer', 'assist', 'player', 'in', 'out', 'minute'];
 
+/** Événements de match produits par une commande acceptée. */
+function triggerEvents(cmd: Command, cue: Cue | null): TriggerEvent[] {
+  if (cmd.type === 'start_period') return ['period_start'];
+  if (cmd.type === 'end_period') return ['period_end'];
+  if (cmd.type === 'start_shootout') return ['shootout_start'];
+  if (!cue) return [];
+  switch (cue.type) {
+    case 'goal':
+      return ['goal', cue.team === 'home' ? 'goal_home' : 'goal_away'];
+    case 'card':
+      return [cue.color === 'yellow' ? 'card_yellow' : 'card_red'];
+    case 'penalty_missed':
+      return [];
+    default:
+      return [cue.type];
+  }
+}
+
 /** Tient l'état du match : applique les commandes, écrit le journal, prévient les abonnés. */
 export class MatchStore {
   readonly skippedLines: number;
@@ -43,6 +62,8 @@ export class MatchStore {
   private simulation = false;
   private rev = 0;
   private listeners = new Set<(cue: Cue | null) => void>();
+  private triggerListeners = new Set<(events: TriggerEvent[]) => void>();
+  private lastCue: Cue | null = null;
 
   constructor(
     private readonly dataDir: string,
@@ -90,7 +111,26 @@ export class MatchStore {
     return () => this.listeners.delete(fn);
   }
 
+  /** Événements de match, pour les automatismes (vMix). Rien n'est signalé pendant une simulation. */
+  onTrigger(fn: (events: TriggerEvent[]) => void): () => void {
+    this.triggerListeners.add(fn);
+    return () => this.triggerListeners.delete(fn);
+  }
+
   execute(cmd: Command): Ack {
+    const fresh = !this.seen.has(cmd.cid);
+    const phaseBefore = this.match.clock.phase;
+    this.lastCue = null;
+    const ack = this.run(cmd);
+    if (ack.ok && fresh && !this.simulation) {
+      const events = triggerEvents(cmd, this.lastCue);
+      if (phaseBefore !== 'ended' && this.match.clock.phase === 'ended') events.push('match_end');
+      if (events.length) for (const fn of this.triggerListeners) fn(events);
+    }
+    return ack;
+  }
+
+  private run(cmd: Command): Ack {
     const ok: Ack = { type: 'ack', cid: cmd.cid, ok: true };
     const refuse = (reason: string): Ack => ({ type: 'ack', cid: cmd.cid, ok: false, reason });
     // Une commande déjà reçue (double appui, renvoi après coupure) n'est appliquée qu'une fois.
@@ -269,6 +309,7 @@ export class MatchStore {
   private changed(cid: string, ack: Ack, cue: Cue | null = null): Ack {
     this.seen.add(cid);
     this.rev++;
+    this.lastCue = cue;
     for (const fn of this.listeners) fn(cue);
     return ack;
   }

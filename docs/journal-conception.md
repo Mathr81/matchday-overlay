@@ -169,3 +169,17 @@ Retour du 9 octobre sur l'étape 3 : tout fonctionne.
 - Vérifié : 42 tests ; parcours de l'admin joué dans un navigateur (modification, couleur invalide refusée avec son message, ajout d'un joueur, enregistrement relu côté serveur).
 - Pas vérifié : l'envoi d'un vrai fichier image depuis le sélecteur de fichiers (l'API est testée, pas le bouton).
 - Reste pour finir l'étape 6 : les thèmes Régie et Clair, chacun avec une étude de mouvement à valider avant d'être construit.
+
+9 octobre : toujours pas de test possible côté utilisateur ; les thèmes Régie et Clair attendent qu'il puisse juger des maquettes. Étape 8 faite avant l'étape 7.
+
+### Étape 8 — vMix et Companion (faite le 9 octobre)
+
+- Réglages privés (PIN, clé Companion, vMix) séparés de la configuration publique : ils ne sont jamais envoyés aux overlays.
+- Le magasin signale les événements de match (but, but de chaque équipe, but refusé, penalty, cartons, remplacement, début et fin de période, tirs au but, fin du match, annonce du vainqueur). Rien pour une correction sans annonce, une commande reçue deux fois, ou pendant une simulation.
+- `src/server/vmix.ts` : table de déclencheurs, interrupteur général, délai par ligne, appel de test, journal des cinquante derniers appels, vérification de la connexion. Un échec est noté et n'a aucun effet sur l'habillage.
+- Admin : sections vMix (déclencheurs, test, journal) et Companion (clé, adresses prêtes à copier).
+- Adresses `/api/do/…` protégées par la clé : score, bandeaux, panneaux, thème. Pas d'actions de match.
+- Valeurs par défaut prudentes : rien d'actif, exemples qui ne changent pas de plan.
+- Vérifié : 50 tests ; essai de bout en bout avec un faux vMix local (connexion, appel de test, déclenchement réel sur un but).
+- Constat pendant l'essai : un vrai vMix 29 tournait sur ce PC et a répondu à la vérification de connexion (lecture seule). Aucune fonction ne lui a été envoyée : les appels de test sont partis vers le faux vMix.
+- Pas vérifié : l'effet réel des fonctions dans vMix. Les noms `OverlayInput2In` et `ReplayMarkInOut` des exemples viennent de ma connaissance de l'API vMix et sont à confirmer dans vMix avec le bouton « Tester ».

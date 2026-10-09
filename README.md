@@ -2,7 +2,7 @@
 
 Habillage de score animé pour les lives du BDT, piloté depuis un téléphone et affiché dans vMix ou OBS.
 
-État actuel : **étape 6 sur 9, en cours**. Tout un match de foot se gère en thème Tigre, du compte à rebours à la séance de tirs au but, et tout se configure depuis la page d'admin. Le reste (thèmes Régie et Clair, format vertical, vMix) est décrit dans `docs/superpowers/specs/2026-10-08-matchday-overlay-design.md`.
+État actuel : tout un match de foot se gère en thème Tigre, du compte à rebours à la séance de tirs au but ; tout se configure depuis la page d'admin ; les déclencheurs vMix et les adresses pour Companion sont en place. Restent les thèmes Régie et Clair et le format vertical, décrits dans `docs/superpowers/specs/2026-10-08-matchday-overlay-design.md`.
 
 ## Lancer
 
@@ -48,6 +48,41 @@ Si Windows demande d'autoriser Node.js sur le réseau, accepte pour les réseaux
 - **Code PIN**.
 
 Une valeur invalide est refusée avec un message qui dit laquelle. La configuration est écrite dans `data/config.json` et les logos envoyés dans `data/uploads/` ; modifier le fichier à la main reste possible, serveur arrêté.
+
+## vMix et Companion
+
+### Déclencher des actions dans vMix
+
+Dans la page d'admin, section « vMix ».
+
+1. Dans vMix : Réglages → Web Controller, coche l'activation et note le port (8088 par défaut).
+2. Dans l'admin : vérifie l'adresse (`http://127.0.0.1:8088` si vMix est sur le même PC) et clique « Vérifier la connexion ». La version de vMix doit s'afficher.
+3. Ajoute un déclencheur : choisis l'événement (but, carton rouge, fin du match, annonce du vainqueur…), puis la fonction vMix et ses paramètres, tels qu'ils apparaissent dans la liste des fonctions de l'API vMix (`Function`, `Input`, `Value`, `Duration`).
+4. « Tester » envoie l'appel tout de suite pour voir l'effet dans vMix.
+5. Coche « Actif » sur la ligne, puis « Activer les déclencheurs pendant le match », et enregistre.
+
+À savoir :
+
+- Rien n'est actif au départ. Les trois lignes fournies sont des exemples à adapter (un jingle en overlay sur un but, un marquage de replay, un générique à l'annonce du vainqueur) ; aucun ne change de plan à l'antenne. Les noms d'inputs sont inventés : remplace-les par les tiens.
+- Un stinger est une transition dans vMix : la fonction `Stinger1` envoie le plan de prévisualisation à l'antenne. Ne l'accroche à un but que si c'est ce que tu veux.
+- Si vMix ne répond pas, l'appel est noté dans « Derniers appels » et l'habillage s'affiche quand même.
+- Une correction sans annonce (bouton + du score) ne déclenche rien, et rien ne part pendant une simulation.
+- Un délai en millisecondes permet de caler l'appel sur l'animation (le plein écran d'un but dure environ deux secondes et demie).
+
+### Piloter l'affichage depuis Companion ou un Stream Deck
+
+La section « Companion et Stream Deck » de l'admin liste des adresses prêtes à copier, avec leur clé. Dans Companion, ajoute une connexion « Generic HTTP » et une action GET par bouton.
+
+| Adresse | Effet |
+|---|---|
+| `/api/do/score/toggle` (ou `show`, `hide`) | Afficher ou masquer le score |
+| `/api/do/banner/1` (ou `2`, `3`…, `off`) | Lancer ou retirer un bandeau enregistré |
+| `/api/do/panel/summary` (ou `prematch`, `lineup-home`, `lineup-away`, `stats`, `holding`, `off`) | Afficher ou retirer un panneau |
+| `/api/do/theme/tigre` | Changer de thème |
+
+Toutes prennent `?key=…`. Les buts, cartons et tirs au but ne passent pas par là : ils restent sur la page de contrôle, où l'on choisit le joueur.
+
+Pour les plans de caméra, les replays et le son, le module vMix de Companion fait déjà le travail : inutile de passer par cette app.
 
 ## Page de contrôle
 

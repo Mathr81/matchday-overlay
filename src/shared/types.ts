@@ -247,3 +247,57 @@ export interface Ack {
 export type ServerMessage = Snapshot | Ack | CueMessage;
 export type ClientMessage = { type: 'command'; command: Command };
 export type Role = 'overlay' | 'control';
+
+// ---- réglages qui ne quittent pas le serveur et la page d'admin ----
+
+/** Événements de match auxquels on peut accrocher un appel vMix. */
+export const TRIGGER_EVENTS = {
+  goal: 'But (les deux équipes)',
+  goal_home: "But de l'équipe 1",
+  goal_away: "But de l'équipe 2",
+  goal_disallowed: 'But refusé',
+  penalty: 'Penalty annoncé',
+  card_yellow: 'Carton jaune',
+  card_red: 'Carton rouge ou deuxième jaune',
+  substitution: 'Remplacement',
+  period_start: "Début d'une période",
+  period_end: "Fin d'une période",
+  shootout_start: 'Début des tirs au but',
+  match_end: 'Fin du match',
+  winner: 'Annonce du vainqueur',
+} as const;
+export type TriggerEvent = keyof typeof TRIGGER_EVENTS;
+
+export interface VmixTrigger {
+  id: string;
+  on: TriggerEvent;
+  enabled: boolean;
+  /** Nom de la fonction de l'API vMix, par exemple OverlayInput2In. */
+  function: string;
+  input?: string;
+  value?: string;
+  duration?: string;
+  delayMs: number;
+}
+
+export interface VmixSettings {
+  /** Interrupteur général : coupé, aucun appel ne part pendant le match. */
+  enabled: boolean;
+  /** Adresse du contrôleur web de vMix. */
+  host: string;
+  triggers: VmixTrigger[];
+}
+
+export interface VmixLogEntry {
+  at: number;
+  url: string;
+  ok: boolean;
+  detail: string;
+}
+
+export interface PrivateSettings {
+  pin: string;
+  /** Clé des adresses de pilotage pour Companion. */
+  apiKey: string;
+  vmix: VmixSettings;
+}

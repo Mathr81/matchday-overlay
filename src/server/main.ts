@@ -16,15 +16,16 @@ if (!fs.existsSync(webDir)) {
   process.exit(1);
 }
 
-const { config, pin } = loadConfig(dataDir);
+const { config, settings } = loadConfig(dataDir);
+const { pin } = settings;
 const store = new MatchStore(dataDir, config);
 const app = await buildApp({
   store,
   webDir,
   logosDir: path.join(root, 'assets', 'logos'),
   uploadsDir: path.join(dataDir, 'uploads'),
-  pin,
-  onSave: (next, nextPin) => saveConfig(dataDir, next, nextPin),
+  settings,
+  onSave: (next, nextSettings) => saveConfig(dataDir, next, nextSettings),
 });
 await app.listen({ port, host: '0.0.0.0' });
 

@@ -2,11 +2,13 @@
   import { onMount } from 'svelte';
   import { api, savedToken } from '../client/connection';
   import PinForm from '../client/PinForm.svelte';
-  import { THEMES } from '../shared/types';
-  import type { Config, TeamId } from '../shared/types';
+  import { THEMES, TRIGGER_EVENTS } from '../shared/types';
+  import type { Config, PrivateSettings, TeamId, TriggerEvent, VmixLogEntry, VmixTrigger } from '../shared/types';
 
   let config = $state<Config | null>(null);
-  let pin = $state('');
+  let settings = $state<PrivateSettings | null>(null);
+  let vmixStatus = $state<{ ok: boolean; detail: string } | null>(null);
+  let vmixLog = $state<VmixLogEntry[]>([]);
   let needPin = $state(!savedToken());
   let message = $state<{ text: string; ok: boolean } | null>(null);
   let saving = $state(false);
@@ -18,19 +20,46 @@
     { id: 'away', label: 'Équipe 2 (à droite)' },
   ];
   const themeNames: Record<string, string> = { tigre: 'Tigre' };
-  const dirty = $derived(config !== null && JSON.stringify({ config, pin }) !== saved);
+  const dirty = $derived(config !== null && JSON.stringify({ config, settings }) !== saved);
+  const events = Object.entries(TRIGGER_EVENTS) as [TriggerEvent, string][];
+  const origin = location.origin;
 
   async function load() {
-    const res = await api<{ config: Config; pin: string }>('/api/config');
+    const res = await api<{ config: Config; settings: PrivateSettings }>('/api/config');
     if (res.error !== undefined) {
       if (res.denied) needPin = true;
       else message = { text: res.error, ok: false };
       return;
     }
     config = res.config;
-    pin = res.pin;
-    saved = JSON.stringify({ config, pin });
+    settings = res.settings;
+    saved = JSON.stringify({ config, settings });
+    refreshLog();
   }
+
+  async function checkVmix() {
+    vmixStatus = { ok: false, detail: 'Vérification…' };
+    const res = await api<{ ok: boolean; detail: string }>('/api/vmix/status');
+    vmixStatus = res.error !== undefined ? { ok: false, detail: res.error } : res;
+  }
+
+  async function refreshLog() {
+    const res = await api<{ log: VmixLogEntry[] }>('/api/vmix/log');
+    if (res.error === undefined) vmixLog = res.log;
+  }
+
+  /** Envoie l'appel à vMix tout de suite, avec les valeurs à l'écran, même non enregistrées. */
+  async function testTrigger(t: VmixTrigger) {
+    const res = await api<VmixLogEntry>('/api/vmix/test', { function: t.function, input: t.input, value: t.value, duration: t.duration });
+    message = res.error !== undefined ? { text: res.error, ok: false } : { text: res.ok ? 'vMix a accepté l\u2019appel.' : res.detail, ok: res.ok };
+    refreshLog();
+  }
+
+  function addTrigger() {
+    settings?.vmix.triggers.push({ id: `t${Date.now().toString(36)}`, on: 'goal', enabled: false, function: '', delayMs: 0 });
+  }
+
+  const time = (at: number) => new Date(at).toLocaleTimeString('fr-FR');
 
   onMount(() => {
     if (!needPin) load();
@@ -43,13 +72,13 @@
   async function save() {
     if (!config) return;
     saving = true;
-    const res = await api<{ token: string }>('/api/config', { config, pin });
+    const res = await api<{ token: string }>('/api/config', { config, settings });
     saving = false;
     if (res.error !== undefined) {
       message = { text: res.error, ok: false };
       return;
     }
-    saved = JSON.stringify({ config, pin });
+    saved = JSON.stringify({ config, settings });
     message = { text: 'Enregistré. Les écrans sont à jour.', ok: true };
     setTimeout(() => message?.ok && (message = null), 4000);
   }
@@ -83,7 +112,7 @@
       load();
     }}
   />
-{:else if config}
+{:else if config && settings}
   <main>
     <header>
       <h1>Configuration</h1>
@@ -167,9 +196,75 @@
     </section>
 
     <section>
+      <h2>vMix</h2>
+      <p class="hint">
+        Quand un événement de match arrive, l'app peut appeler une fonction de vMix. Si vMix ne répond pas, l'habillage s'affiche quand même.
+        Rien ne part pendant une simulation.
+      </p>
+      <div class="grid">
+        <label class="check"><input type="checkbox" bind:checked={settings.vmix.enabled} /> Activer les déclencheurs pendant le match</label>
+        <label>Adresse du contrôleur web de vMix<input bind:value={settings.vmix.host} maxlength="100" /></label>
+        <div class="status">
+          <button onclick={checkVmix}>Vérifier la connexion</button>
+          {#if vmixStatus}<span class:ok={vmixStatus.ok}>{vmixStatus.detail}</span>{/if}
+        </div>
+      </div>
+
+      <h3>Déclencheurs</h3>
+      {#each settings.vmix.triggers as t, i (t.id)}
+        <div class="trigger">
+          <label class="check"><input type="checkbox" bind:checked={t.enabled} /> Actif</label>
+          <label>
+            Quand
+            <select bind:value={t.on}>
+              {#each events as [id, label] (id)}<option value={id}>{label}</option>{/each}
+            </select>
+          </label>
+          <label>Fonction vMix<input bind:value={t.function} maxlength="60" placeholder="OverlayInput2In" /></label>
+          <label>Input<input bind:value={t.input} maxlength="120" placeholder="nom ou numéro" /></label>
+          <label>Value<input bind:value={t.value} maxlength="120" /></label>
+          <label>Duration<input bind:value={t.duration} maxlength="120" /></label>
+          <label>Délai (ms)<input type="number" min="0" max="60000" step="100" bind:value={t.delayMs} /></label>
+          <div class="actions">
+            <button onclick={() => testTrigger(t)} disabled={!t.function}>Tester</button>
+            <button class="ghost" onclick={() => settings?.vmix.triggers.splice(i, 1)}>Retirer</button>
+          </div>
+        </div>
+      {/each}
+      <button onclick={addTrigger}>Ajouter un déclencheur</button>
+      <p class="hint">« Tester » envoie l'appel tout de suite, même si les déclencheurs sont désactivés. Les trois lignes fournies sont des exemples à adapter.</p>
+
+      {#if vmixLog.length}
+        <h3>Derniers appels</h3>
+        <ul class="log">
+          {#each vmixLog.slice(0, 8) as entry (entry.at + entry.url)}
+            <li class:ok={entry.ok}><b>{time(entry.at)}</b> {entry.url.split('/api/?')[1] ?? entry.url} — {entry.detail}</li>
+          {/each}
+        </ul>
+      {/if}
+    </section>
+
+    <section>
+      <h2>Companion et Stream Deck</h2>
+      <p class="hint">
+        Des adresses simples pour piloter l'affichage depuis Bitfocus Companion (action « HTTP GET ») ou tout autre outil. Les buts et les cartons restent sur la page de contrôle.
+      </p>
+      <div class="grid">
+        <label>Clé<input bind:value={settings.apiKey} maxlength="64" /></label>
+      </div>
+      <ul class="urls">
+        <li><code>{origin}/api/do/score/toggle?key={settings.apiKey}</code> afficher ou masquer le score (aussi <code>show</code>, <code>hide</code>)</li>
+        <li><code>{origin}/api/do/banner/1?key={settings.apiKey}</code> lancer ou retirer le premier bandeau enregistré (<code>2</code>, <code>3</code>… ou <code>off</code>)</li>
+        <li><code>{origin}/api/do/panel/summary?key={settings.apiKey}</code> afficher un panneau : <code>prematch</code>, <code>lineup-home</code>, <code>lineup-away</code>, <code>summary</code>, <code>stats</code>, <code>holding</code>, ou <code>off</code></li>
+        <li><code>{origin}/api/do/theme/tigre?key={settings.apiKey}</code> changer de thème</li>
+      </ul>
+      <p class="hint">Depuis un autre appareil que ce PC, remplace <code>localhost</code> par l'adresse du PC sur le réseau.</p>
+    </section>
+
+    <section>
       <h2>Code PIN</h2>
       <div class="grid">
-        <label>Code du contrôle (4 à 8 chiffres)<input bind:value={pin} inputmode="numeric" maxlength="8" /></label>
+        <label>Code du contrôle (4 à 8 chiffres)<input bind:value={settings.pin} inputmode="numeric" maxlength="8" /></label>
       </div>
       <p class="hint">Le changer déconnecte tous les téléphones : ils devront saisir le nouveau code.</p>
     </section>
@@ -315,6 +410,58 @@
     grid-template-columns: 1fr 1fr 1fr 90px;
     gap: 8px;
     margin-bottom: 8px;
+  }
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .status span,
+  .log li {
+    color: #ff9d6b;
+  }
+  .status span.ok,
+  .log li.ok {
+    color: #23d17a;
+  }
+  .trigger {
+    display: grid;
+    grid-template-columns: 80px 1.4fr 1.2fr 1fr 0.7fr 0.7fr 0.7fr auto;
+    gap: 8px;
+    align-items: end;
+    padding: 10px 0;
+    border-bottom: 1px solid #1f1f22;
+  }
+  .trigger .actions {
+    display: flex;
+    gap: 4px;
+  }
+  .log,
+  .urls {
+    margin: 0 0 10px;
+    padding: 0;
+    list-style: none;
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .urls li {
+    color: #9b978f;
+  }
+  code {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    color: #edeae4;
+    background: #1b1b1d;
+    padding: 2px 5px;
+    border-radius: 4px;
+    word-break: break-all;
+  }
+  @media (max-width: 900px) {
+    .trigger {
+      grid-template-columns: 1fr 1fr;
+    }
   }
   button {
     font: inherit;
