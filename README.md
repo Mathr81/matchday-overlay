@@ -6,9 +6,10 @@ Habillage de score animé pour les lives du BDT, piloté depuis un téléphone e
 
 ## Lancer
 
-Il faut Node.js 24 et pnpm.
+Deux façons :
 
-- Double-clic sur `start.bat`, ou dans un terminal : `pnpm install` puis `pnpm start`.
+- **Avec l'exe** (rien à installer) : double-clic sur `matchday-overlay.exe`. Tout est dedans : le serveur, les pages, les polices et les logos fournis. Il crée un dossier `data` à côté de lui pour la configuration et le match ; pour changer de PC, copie l'exe et ce dossier. L'exe n'est pas dans le dépôt (95 Mo) : il se fabrique avec `pnpm exe` et sort dans `release/`. Au premier lancement, Windows peut afficher « Windows a protégé votre ordinateur » parce que l'exe n'est pas signé (« Informations complémentaires », puis « Exécuter quand même ») et demander l'autorisation du pare-feu : accepte-la, sinon le téléphone ne pourra pas se connecter.
+- **Depuis le code** (il faut Node.js 24 et pnpm) : double-clic sur `start.bat`, ou dans un terminal : `pnpm install` puis `pnpm start`.
 - La console affiche les adresses et un QR code pour ouvrir le contrôle sur le téléphone (même réseau WiFi que le PC).
 
 | Page | Adresse |
@@ -176,5 +177,6 @@ Le plus rapide : lancer la simulation avec l'overlay ouvert dans vMix, une fois 
 
 - `pnpm test` : tests de la logique de match et du serveur.
 - `pnpm check` : vérification des types.
+- `pnpm exe` : fabrique `release/matchday-overlay.exe` (le Node de la machine avec le serveur et les pages injectés dedans ; voir `scripts/build-exe.mjs`).
 - `pnpm dev:server` et `pnpm dev:web` : serveur et pages avec rechargement à chaud (pages sur le port 5173).
 - Un thème est un dossier de `src/themes/` qui fournit quatre composants (score, moments, panneaux, bandeau libre) ; il s'ajoute dans `src/themes/index.ts`, `src/themes/names.ts` et la liste `THEMES` de `src/shared/types.ts`.

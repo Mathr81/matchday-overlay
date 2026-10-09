@@ -237,3 +237,15 @@ Pas vérifié, et c'est important : le mouvement lui-même. Mon navigateur de te
 - Étape 9 : répétition générale sur le PC de régie (liste dans le README, « Ce qui reste à vérifier »).
 - Retours de l'utilisateur sur Régie et Clair.
 - Décider comment produire le flux vertical.
+
+## Exe autonome
+
+Demande : « un petit .exe ». `pnpm exe` fabrique `release/matchday-overlay.exe` avec le mécanisme d'exécutable unique de Node : le serveur est regroupé en un seul fichier par esbuild, les pages construites et les logos fournis sont embarqués, puis le tout est injecté dans une copie de `node.exe`.
+
+- Les fichiers embarqués sont dépliés au démarrage dans un dossier temporaire (une fois par version de l'exe), parce que le serveur de fichiers statiques lit sur le disque.
+- Les données (`data/`) sont créées à côté de l'exe, pas dans le dossier courant : un double-clic depuis n'importe où retrouve le même match.
+- En cas d'erreur (port déjà pris), la fenêtre attend Entrée au lieu de se fermer.
+- Pas « petit » : 95 Mo, c'est le poids de Node. L'exe n'est donc pas suivi par git.
+- Non signé : Windows peut afficher un avertissement au premier lancement.
+
+Vérifié : lancé depuis un dossier vide, toutes les pages, les logos et la connexion en direct répondent ; le deuxième lancement affiche le message de port déjà pris. Non vérifié : sur un PC sans Node installé (il ne devrait pas en avoir besoin, mais je n'en ai pas sous la main).
